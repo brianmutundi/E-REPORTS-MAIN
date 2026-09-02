@@ -1,75 +1,114 @@
-export type SubjectAnalysis = {
-  subjectId: string
-  subjectName: string
-  learnerCount: number
-  assessedCount: number
-  average: number | null
-  highest: number | null
-  lowest: number | null
+// Assessment Analysis model types.
+//
+// The CBC palette used for performance levels across every surface (web
+// preview and PDF) so EE/ME/AE/BE are always visually consistent:
+//   EE -> green, ME -> blue, AE -> amber, BE -> red
+export const LEVEL_COLOR: Record<string, string> = {
+  EE: '#15803d',
+  ME: '#2563eb',
+  AE: '#d97706',
+  BE: '#dc2626',
 }
 
-export type StreamAnalysis = {
-  streamId: string
-  streamName: string
-  learnerCount: number
-  assessedCount: number
-  averageTotal: number | null
-  topLearner: string | null
-  topTotal: number | null
-  levelCounts: Record<string, number>
+export const LEVEL_DEFAULT: { code: string; description: string; color: string }[] = [
+  { code: 'EE', description: 'Exceeding Expectation', color: LEVEL_COLOR.EE },
+  { code: 'ME', description: 'Meeting Expectation', color: LEVEL_COLOR.ME },
+  { code: 'AE', description: 'Approaching Expectation', color: LEVEL_COLOR.AE },
+  { code: 'BE', description: 'Below Expectation', color: LEVEL_COLOR.BE },
+]
+
+// Fallback used only when a configured level has no known colour.
+export function levelColor(code: string): string {
+  return LEVEL_COLOR[code] ?? '#64748b'
 }
 
-export type LearnerSubjectAnalysis = {
-  subjectId: string
-  subjectName: string
-  score: number | null
-  grade: string
-  gradeDescription: string
-}
-
-export type LearnerAnalysis = {
-  studentId: string
-  admissionNo: string
-  fullName: string
+export type AnalysisScope = {
+  schoolName: string
+  schoolCode: string | null
+  schoolAddress: string | null
+  schoolLogoUrl: string | null
+  gradeId: string
+  gradeName: string
   streamId: string | null
   streamName: string | null
-  assessedCount: number
-  expectedCount: number
-  complete: boolean
-  total: number | null
-  percent: number | null
-  overallLevel: string
-  overallDescription: string
-  gradePosition: number | null
-  streamPosition: number | null
-  subjects: LearnerSubjectAnalysis[]
-}
-
-export type LevelCount = { grade: string; description: string; count: number }
-
-export type GradeAnalysis = {
-  classId: string
-  className: string
-  learnerCount: number
-  assessedCount: number
-  averageTotal: number | null
-  averagePercent: number | null
-  topLearner: string | null
-  topTotal: number | null
-  levelDistribution: LevelCount[]
-  streams: StreamAnalysis[]
-  learningAreas: SubjectAnalysis[]
-  learners: LearnerAnalysis[]
-}
-
-export type AssessmentAnalysis = {
   examId: string
   examName: string
   term: string | null
   academicYear: number | null
-  grades: GradeAnalysis[]
+  assessmentComponent: 'mid_term' | 'end_term' | null
+  classTeacherName: string | null
 }
 
+export type AnalysisLearnerSubject = {
+  subjectId: string
+  subjectName: string
+  score: number | null
+}
+
+export type AnalysisAssessedLearner = {
+  studentId: string
+  admissionNo: string
+  fullName: string
+  assessedCount: number
+  expectedCount: number
+  total: number
+  percentage: number
+  overallLevel: string
+  overallDescription: string
+  subjects: AnalysisLearnerSubject[]
+}
+
+export type AnalysisRankRow = AnalysisAssessedLearner & { position: number }
+
+export type AnalysisLevel = {
+  code: string
+  description: string
+  count: number
+  percentage: number | null
+  color: string
+}
+
+export type AnalysisLearningAreaResult = {
+  subjectId: string
+  subjectName: string
+  meanPercentage: number | null
+  highestName: string | null
+  highestScore: number | null
+  lowestName: string | null
+  lowestScore: number | null
+  insufficient: boolean
+}
+
+export type HistogramBin = {
+  label: string
+  from: number
+  to: number
+  count: number
+  percentage: number | null
+}
+
+export type Insight = {
+  kind: 'strength' | 'weakness' | 'coverage' | 'concentration' | 'info'
+  text: string
+}
+
+export type Anomaly = {
+  learnerName: string
+  admissionNo: string
+  reason: string
+}
+
+export type Recommendation = {
+  category: 'Assessment Capture' | 'Learning Area Support' | 'Data Quality' | 'Trend'
+  text: string
+}
+
+export type TrendPoint = {
+  label: string
+  percentage: number
+}
+
+// Per-learner assessment trend used by the learner drill-down endpoint.
 export type LearnerTrendScores = {
   examId: string
   examName: string
@@ -83,8 +122,30 @@ export type LearnerTrendScores = {
   positions: { classId: string; className: string; position: number }[]
 }
 
-const LEVEL_COLORS = ['#6366f1', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#a855f7', '#14b8a6', '#f97316']
-
-export function levelColor(index: number) {
-  return LEVEL_COLORS[index % LEVEL_COLORS.length]
+export type AssessmentAnalysisModel = {
+  scope: AnalysisScope
+  learningAreas: { subjectId: string; subjectName: string }[]
+  maxTotal: number
+  enrolledCount: number
+  assessedCount: number
+  partialCount: number
+  unassessedCount: number
+  coveragePercentage: number
+  classMeanPercentage: number | null
+  medianPercentage: number | null
+  standardDeviation: number | null
+  highestPercentage: number | null
+  lowestPercentage: number | null
+  topLearner: { name: string; total: number; percentage: number } | null
+  performanceDistribution: AnalysisLevel[]
+  learningAreaResults: AnalysisLearningAreaResult[]
+  ranking: AnalysisRankRow[]
+  scoreDistribution: HistogramBin[]
+  trend: TrendPoint[]
+  anomalies: Anomaly[]
+  unassessedLearners: { studentId: string; admissionNo: string; fullName: string }[]
+  insights: Insight[]
+  recommendations: Recommendation[]
+  coverageWarning: string | null
+  generatedAt: string
 }

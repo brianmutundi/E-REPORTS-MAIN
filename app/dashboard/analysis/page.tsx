@@ -1,4 +1,4 @@
-import { getAssessmentAnalysis } from '@/lib/analysis'
+import { buildAssessmentAnalysis } from '@/lib/analysis'
 import { getDashboardSession } from '@/lib/supabase/session'
 import { getScopeStreams, getScopeExams } from '@/lib/scope'
 import AnalysisExplorer from '@/components/analysis/AnalysisExplorer'
@@ -40,7 +40,9 @@ export default async function AnalysisPage({ searchParams }: { searchParams: Pro
 
   const gradeValid = Boolean(params.class && (allClasses ?? []).some(c => c.id === params.class))
 
-  const analysis = params.exam && gradeValid ? await getAssessmentAnalysis(params.exam, params.stream) : null
+  const analysis = params.exam && params.class && gradeValid ? await buildAssessmentAnalysis({ examId: params.exam, classId: params.class, streamId: params.stream }) : null
+
+  const selectedGradeName = (allClasses ?? []).find(c => c.id === params.class)?.name
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
@@ -49,12 +51,12 @@ export default async function AnalysisPage({ searchParams }: { searchParams: Pro
           <p className="eyebrow">School Performance Intelligence</p>
           <h1 className="title">Assessment Analysis</h1>
           <p className="text-xs text-slate-500 mt-1">
-            Select a grade, then assessment to view analysis. Drill into a stream, learning area, or learner.
+            Select a grade and assessment to generate a CBC assessment analysis report.
           </p>
         </div>
         <div className="flex items-center gap-2">
           <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold">
-            <BarChart3 className="h-3.5 w-3.5" /> Real data · blank scores are absent
+            <BarChart3 className="h-3.5 w-3.5" /> Real data · blank scores are absent, never zero
           </span>
         </div>
       </div>
@@ -101,8 +103,26 @@ export default async function AnalysisPage({ searchParams }: { searchParams: Pro
         </div>
       )}
 
-      {analysis && 'grades' in analysis && (
-        <AnalysisExplorer analysis={analysis} initialGradeId={params.class} streamId={params.stream} />
+      {analysis && 'scope' in analysis && (
+        <AnalysisExplorer analysis={analysis} streamId={params.stream} />
+      )}
+
+      {!analysis && (
+        <div className="rounded-2xl bg-white border border-slate-200/80 shadow-sm p-10 text-center">
+          {!params.class ? (
+            <p className="text-sm font-medium text-slate-500">Select a Grade to continue.</p>
+          ) : !params.exam ? (
+            <p className="text-sm font-medium text-slate-500">
+              {params.class && gradeValid
+                ? hasExams
+                  ? 'Please select an assessment to generate the analysis.'
+                  : `No assessments are available for ${selectedGradeName ?? 'this grade'}.`
+                : 'Select a valid Grade to continue.'}
+            </p>
+          ) : (
+            <p className="text-sm font-medium text-slate-500">Select an assessment to generate the analysis.</p>
+          )}
+        </div>
       )}
     </div>
   )
