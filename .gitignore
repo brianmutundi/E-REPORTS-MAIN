@@ -56,3 +56,10 @@ Thumbs.db
 
 .vercel
 .env*
+
+# Development backup / scratch files — never commit
+*.bak
+*.backup
+*.backup2
+*_backup_*/
+supabase/migrations_backup_*/
