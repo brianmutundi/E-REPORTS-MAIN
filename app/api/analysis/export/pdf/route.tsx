@@ -211,9 +211,10 @@ export async function GET(request: NextRequest) {
   const url = new URL(request.url)
   const examId = url.searchParams.get('exam')?.trim()
   const classId = url.searchParams.get('class')?.trim()
+  const streamId = url.searchParams.get('stream')?.trim() || undefined
   if (!examId) return new Response('exam is required', { status: 400 })
 
-  const analysis = await getAssessmentAnalysis(examId)
+  const analysis = await getAssessmentAnalysis(examId, streamId)
   if ('error' in analysis) return new Response(analysis.error, { status: 400 })
 
   const grades = classId ? analysis.grades.filter(g => g.classId === classId) : analysis.grades

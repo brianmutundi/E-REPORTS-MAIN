@@ -7,7 +7,7 @@ import { levelColor, type AssessmentAnalysis, type GradeAnalysis, type LearnerAn
 
 const ACCENTS = ['#059669', '#10b981', '#34d399', '#047857', '#14b8a6', '#a7f3d0']
 
-export default function AnalysisExplorer({ analysis, initialGradeId }: { analysis: AssessmentAnalysis; initialGradeId?: string }) {
+export default function AnalysisExplorer({ analysis, initialGradeId, streamId }: { analysis: AssessmentAnalysis; initialGradeId?: string; streamId?: string }) {
   const [selectedGradeId, setSelectedGradeId] = useState<string | null>(initialGradeId ?? null)
   const [expandedStudent, setExpandedStudent] = useState<string | null>(null)
   const [trends, setTrends] = useState<Record<string, LearnerTrendScores[]>>({})
@@ -40,7 +40,7 @@ export default function AnalysisExplorer({ analysis, initialGradeId }: { analysi
             </button>
           ) : null}
           <a
-            href={`/api/analysis/export/pdf?exam=${analysis.examId}${selectedGrade ? `&class=${selectedGrade.classId}` : ''}`}
+            href={`/api/analysis/export/pdf?exam=${analysis.examId}${selectedGrade ? `&class=${selectedGrade.classId}` : ''}${streamId ? `&stream=${streamId}` : ''}`}
             className="btn min-h-10 py-1.5 px-3"
           >
             <FileDown className="h-4 w-4" />

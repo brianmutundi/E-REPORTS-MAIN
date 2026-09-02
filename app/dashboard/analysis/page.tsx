@@ -102,7 +102,7 @@ export default async function AnalysisPage({ searchParams }: { searchParams: Pro
       )}
 
       {analysis && 'grades' in analysis && (
-        <AnalysisExplorer analysis={analysis} initialGradeId={params.class} />
+        <AnalysisExplorer analysis={analysis} initialGradeId={params.class} streamId={params.stream} />
       )}
     </div>
   )
