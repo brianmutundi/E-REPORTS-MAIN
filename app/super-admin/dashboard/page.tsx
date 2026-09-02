@@ -1,3 +1,4 @@
+import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { TenantForm, AdminForm } from './ActionsForm'
 import { toggleTenantStatus, deleteTenant, signOut } from '../actions'
@@ -5,6 +6,21 @@ import { Building2, ShieldCheck, Users, Power, Trash2, LogOut } from 'lucide-rea
 
 export default async function SuperAdminDashboard() {
   const supabase = await createClient()
+
+  // Defense in depth: this surface is for platform owners only. An admin (or
+  // unauthenticated user) hitting /super-admin must be sent away even if the
+  // middleware is bypassed. (middleware.ts already enforces this; this keeps
+  // the boundary at the page render too.)
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .maybeSingle()
+  if (profile?.role !== 'super_admin') redirect('/dashboard')
 
   const [{ data: tenants }, { data: admins }] = await Promise.all([
     supabase

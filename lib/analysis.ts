@@ -1,5 +1,5 @@
 import { getDashboardSession } from '@/lib/supabase/session'
-import { computePercent, computeTotal, computeTotalMaximum, getGradeRule, getTotalLevel, getTotalDescription, getTenantTotalGradingScale, rankCompetitive, type TotalGradingScale } from './grading'
+import { computePercent, computeTotal, computeTotalMaximum, getGradeRule, getTotalLevel, getTotalDescription, getTenantGradingScale, getTenantTotalGradingScale, rankCompetitive, type TotalGradingScale } from './grading'
 import type { AssessmentAnalysis, GradeAnalysis, LearnerAnalysis, LearnerSubjectAnalysis, LearnerTrendScores, StreamAnalysis, SubjectAnalysis } from './analysis-types'
 
 export type GradeInput = {
@@ -159,8 +159,7 @@ export async function getAssessmentAnalysis(examId: string, streamId?: string): 
     list.push({ subjectId: link.subject_id, subjectName: subject?.name ?? 'Learning Area' })
     expectedSubjectsByClass.set(link.class_id, list)
   }
-  const { data: scaleRows } = await supabase.from('report_grading_levels').select('grade,min,max,description').eq('tenant_id', tenantId).order('sort_order')
-  const scale = scaleRows && scaleRows.length ? scaleRows : [{ grade: 'EE', min: 80, max: 100, description: 'Exceeding Expectations' }, { grade: 'ME', min: 65, max: 79.99, description: 'Meeting Expectations' }, { grade: 'AE', min: 50, max: 64.99, description: 'Approaching Expectations' }, { grade: 'BE', min: 0, max: 49.99, description: 'Below Expectations' }]
+  const scale = await getTenantGradingScale(tenantId)
   const totalScale = await getTenantTotalGradingScale(tenantId)
 
   const marksByStudent = new Map<string, Map<string, number>>()
@@ -201,12 +200,11 @@ export async function getAssessmentAnalysis(examId: string, streamId?: string): 
 
 export async function getLearnerTrend(tenantId: string, studentId: string): Promise<LearnerTrendScores[]> {
   const { supabase } = await getDashboardSession()
-  const [{ data: student }, { data: exams }, { data: scaleRows }] = await Promise.all([
-    supabase.from('students').select('id,class_id').eq('id', studentId).eq('tenant_id', tenantId).maybeSingle(),
+  const { data: student } = await supabase.from('students').select('id,class_id').eq('id', studentId).eq('tenant_id', tenantId).maybeSingle()
+  const [{ data: exams }] = await Promise.all([
     supabase.from('exams').select('id,name,term,academic_year').eq('tenant_id', tenantId).order('created_at', { ascending: false }),
-    supabase.from('report_grading_levels').select('grade,min,max,description').eq('tenant_id', tenantId).order('sort_order'),
   ])
-  const scale = scaleRows && scaleRows.length ? scaleRows : [{ grade: 'EE', min: 80, max: 100, description: 'Exceeding Expectations' }, { grade: 'ME', min: 65, max: 79.99, description: 'Meeting Expectations' }, { grade: 'AE', min: 50, max: 64.99, description: 'Approaching Expectations' }, { grade: 'BE', min: 0, max: 49.99, description: 'Below Expectations' }]
+  const scale = await getTenantGradingScale(tenantId)
   const totalScale = await getTenantTotalGradingScale(tenantId)
 
   const classId = student?.class_id ?? null

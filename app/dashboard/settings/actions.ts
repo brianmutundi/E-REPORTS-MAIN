@@ -7,6 +7,20 @@ export async function uploadSchoolLogo(logoUrl: string): Promise<{ ok: boolean; 
   const { supabase, user, tenantId } = await getDashboardSession()
   if (!user) return { ok: false, error: 'Not signed in' }
   if (!tenantId) return { ok: false, error: 'No school linked' }
+
+  // The report PDFs fetch the logo server-side, so only permit https URLs to
+  // avoid loading arbitrary/external resources or non-http schemes during
+  // report generation. The uploader always saves a Supabase public URL.
+  let parsed: URL
+  try {
+    parsed = new URL(logoUrl)
+  } catch {
+    return { ok: false, error: 'Invalid logo URL.' }
+  }
+  if (parsed.protocol !== 'https:' || !parsed.hostname) {
+    return { ok: false, error: 'Logo URL must be a valid https address.' }
+  }
+
   const { error } = await supabase.from('tenants').update({ logo_url: logoUrl }).eq('id', tenantId)
   if (error) return { ok: false, error: error.message }
   revalidatePath('/dashboard/settings')
