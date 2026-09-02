@@ -12,22 +12,34 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const { supabase, user, tenantId } = await getDashboardSession()
   if (!user) return <main className="main"><p>Please sign in.</p></main>
   if (!tenantId) return <main className="main"><p>No school is linked to this account.</p></main>
-  let { data: classes } = await supabase.from('classes').select('id,name,teacher_name,principal_name').eq('tenant_id', tenantId).order('name')
-  if (classes === null) { const r = await supabase.from('classes').select('id,name').eq('tenant_id', tenantId).order('name'); classes = r.data as any }
-  const [templateRes, gradingScale, streams, exams] = await Promise.all([
+  // Round 1 — independent lookups in parallel (each Supabase round-trip is ~300ms
+  // of remote latency, so batching these avoids a serial waterfall that added up).
+  const [classesRes, templateRes, gradingScale, streams, exams, tenant] = await Promise.all([
+    supabase.from('classes').select('id,name,teacher_name,principal_name').eq('tenant_id', tenantId).order('name'),
     supabase.from('report_templates').select('id,name,template_json').eq('tenant_id', tenantId).eq('is_default', true).maybeSingle(),
     getTenantGradingScale(tenantId),
     params.class ? getScopeStreams(supabase, tenantId, params.class) : Promise.resolve([] as { id: string; name: string }[]),
     params.class ? getScopeExams(supabase, tenantId, params.class) : Promise.resolve([] as ScopeExam[]),
+    getReportTenant(supabase, tenantId),
   ])
+  let classes = classesRes.data
+  if (classes === null) { const r = await supabase.from('classes').select('id,name').eq('tenant_id', tenantId).order('name'); classes = r.data as any }
   const templateRow = templateRes.data
-  const tenant = await getReportTenant(supabase, tenantId)
   const template = normalizeReportTemplate(templateRow?.template_json)
   const hasStreams = streams.length > 0
   const hasExams = exams.length > 0
   const gradeValid = Boolean(params.class && (classes ?? []).some(c => c.id === params.class))
   const hasSelection = Boolean(params.exam && params.class && gradeValid)
-  const configured = hasSelection ? await getConfiguredAssessmentResults(params.exam!, params.class!, template.assessmentComponents, params.stream) : null
+  // Round 2 — the configured report detail (needs templateRow) and the heavy
+  // computed results (needs template + class) are independent of each other.
+  const [{ data: reportConfig }, configured] = hasSelection
+    ? await Promise.all([
+        templateRow?.id
+          ? supabase.from('report_template_configs').select('opening_date,closing_date').eq('report_template_id', templateRow.id).maybeSingle()
+          : Promise.resolve({ data: null }),
+        getConfiguredAssessmentResults(params.exam!, params.class!, template.assessmentComponents, params.stream),
+      ])
+    : [{ data: null }, null]
   const results = configured?.rows ?? []
   const selected = params.student ? results.find(r => r.studentId === params.student) : undefined
   const exam = exams?.find(e => e.id === params.exam)
@@ -35,10 +47,6 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const classTeacherName = (classes?.find(c => c.id === params.class) as any)?.teacher_name ?? null
   const classPrincipalName = (classes?.find(c => c.id === params.class) as any)?.principal_name ?? null
   const batchHref = hasSelection ? `/api/reports/pdf?exam=${params.exam}&class=${params.class}${params.stream ? `&stream=${params.stream}` : ''}` : '#'
-
-  const { data: reportConfig } = templateRow?.id
-    ? await supabase.from('report_template_configs').select('opening_date,closing_date').eq('report_template_id', templateRow.id).maybeSingle()
-    : { data: null }
   const openingDate = reportConfig?.opening_date ?? null
   const closingDate = reportConfig?.closing_date ?? null
 

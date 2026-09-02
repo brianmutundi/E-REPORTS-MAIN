@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { TenantForm, AdminForm } from './ActionsForm'
 import { toggleTenantStatus, deleteTenant, signOut } from '../actions'
 import { Building2, ShieldCheck, Users, Power, Trash2, LogOut } from 'lucide-react'
+import SessionRevalidator from '@/components/SessionRevalidator'
 
 export default async function SuperAdminDashboard() {
   const supabase = await createClient()
@@ -174,6 +175,7 @@ export default async function SuperAdminDashboard() {
           </div>
         )}
       </section>
+      <SessionRevalidator />
     </main>
   )
 }

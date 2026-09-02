@@ -170,40 +170,47 @@ export default async function MarksPage({ searchParams }: { searchParams: Promis
     .order('name')
   const grades = allClasses ?? []
 
-  // Cascade level 2 — streams for the selected grade.
-  const streams = params.class ? await getScopeStreams(supabase, tenantId, params.class) : []
-  const hasStreams = streams.length > 0
-
-  // Cascade level 3 — assessments for the selected grade (via exam_classes).
-  const exams = params.class ? await getScopeExams(supabase, tenantId, params.class) : []
-  const hasExams = exams.length > 0
-
-  // Cascade level 4 — learning areas for the selected grade + assessment.
-  const subjects = params.class && params.exam ? await getScopeSubjects(supabase, tenantId, params.exam, params.class) : []
-  const hasSubjects = subjects.length > 0
-
-  // Cascade level 5 — learners + scores, only when a valid scope is selected.
+  // Cascade levels 2-5. Every lookup below depends only on the URL parameters
+  // (class/exam/subject already selected), never on another lookup's result, so
+  // they are fired in one parallel batch instead of a serial waterfall. Each
+  // Supabase round-trip costs ~300ms of remote network latency, so parallelising
+  // turns the previous ~5 sequential rounds into ~2 (this batch + learners).
   const gradeValid = Boolean(params.class && grades.some(g => g.id === params.class))
-  let students: { id: string; admission_no: string; full_name: string }[] = []
-  let marks: { student_id: string; score: number; updated_at: string }[] = []
+  const scopeReady = Boolean(params.class && params.exam && params.subject && gradeValid)
+
+  let streams: Awaited<ReturnType<typeof getScopeStreams>> = []
+  let exams: Awaited<ReturnType<typeof getScopeExams>> = []
+  let subjects: Awaited<ReturnType<typeof getScopeSubjects>> = []
   let scopeValid = false
 
-  if (params.exam && params.class && params.subject && gradeValid) {
-    scopeValid = await verifyScope(supabase, tenantId, params.exam, params.class, params.subject)
-    if (scopeValid) {
-      const studentQuery = supabase
-        .from('students')
-        .select('id,admission_no,full_name')
-        .eq('tenant_id', tenantId)
-        .eq('class_id', params.class)
-      if (params.stream) studentQuery.eq('stream_id', params.stream)
-      const [{ data: s }, { data: m }] = await Promise.all([
-        studentQuery.order('full_name'),
-        supabase.from('marks').select('student_id,score,updated_at').eq('tenant_id', tenantId).eq('exam_id', params.exam).eq('subject_id', params.subject),
-      ])
-      students = s ?? []
-      marks = m ?? []
-    }
+  ;[streams, exams, subjects, scopeValid] = await Promise.all([
+    params.class ? getScopeStreams(supabase, tenantId, params.class) : Promise.resolve([]),
+    params.class ? getScopeExams(supabase, tenantId, params.class) : Promise.resolve([]),
+    params.class && params.exam ? getScopeSubjects(supabase, tenantId, params.exam, params.class) : Promise.resolve([]),
+    scopeReady ? verifyScope(supabase, tenantId, params.exam!, params.class!, params.subject!) : Promise.resolve(false),
+  ])
+
+  const hasStreams = params.class ? streams.length > 0 : false
+  const hasExams = params.class ? exams.length > 0 : false
+  const hasSubjects = params.class && params.exam ? subjects.length > 0 : false
+
+  // Cascade level 5 — learners + scores, only when a valid scope is selected.
+  let students: { id: string; admission_no: string; full_name: string }[] = []
+  let marks: { student_id: string; score: number; updated_at: string }[] = []
+
+  if (scopeValid) {
+    const studentQuery = supabase
+      .from('students')
+      .select('id,admission_no,full_name')
+      .eq('tenant_id', tenantId)
+      .eq('class_id', params.class!)
+    if (params.stream) studentQuery.eq('stream_id', params.stream)
+    const [{ data: s }, { data: m }] = await Promise.all([
+      studentQuery.order('full_name'),
+      supabase.from('marks').select('student_id,score,updated_at').eq('tenant_id', tenantId).eq('exam_id', params.exam!).eq('subject_id', params.subject!),
+    ])
+    students = s ?? []
+    marks = m ?? []
   }
 
   const scoreMap = new Map(marks.map(m => [m.student_id, { score: m.score, updatedAt: m.updated_at }]))

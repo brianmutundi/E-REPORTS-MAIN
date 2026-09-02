@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import DashboardNav from '@/components/dashboard/DashboardNav'
+import SessionRevalidator from '@/components/SessionRevalidator'
 import { getDashboardSession } from '@/lib/supabase/session'
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -35,6 +36,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       <main id="dashboard-main" tabIndex={-1} className="min-w-0 flex-1 overflow-x-hidden p-3 pb-8 outline-none sm:p-4 sm:pb-10 md:h-screen md:overflow-y-auto md:p-8">
         {children}
       </main>
+      <SessionRevalidator />
     </div>
   )
 }

@@ -3,6 +3,21 @@ import type { NextConfig } from 'next'
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  // pdfkit/@react-pdf/renderer load their standard fonts (e.g.
+  // pdfkit/js/standard-fonts/Helvetica.cjs) at runtime via a dynamic require
+  // that Next.js's static trace cannot see. On Vercel serverless this left the
+  // font files out of the bundle, so every PDF export (/api/reports/pdf,
+  // /api/results/export/pdf, /api/analysis/export/pdf, /api/students/export/pdf)
+  // crashed with MODULE_NOT_FOUND. Keeping these modules external deploys their
+  // full node_modules tree (fonts included) and the includes below force the
+  // font directory into the traced function output as a belt-and-suspenders.
+  serverExternalPackages: ['@react-pdf/renderer', 'pdfkit'],
+  outputFileTracingIncludes: {
+    '/api/reports/pdf': ['./node_modules/pdfkit/js/standard-fonts/**/*'],
+    '/api/results/export/pdf': ['./node_modules/pdfkit/js/standard-fonts/**/*'],
+    '/api/analysis/export/pdf': ['./node_modules/pdfkit/js/standard-fonts/**/*'],
+    '/api/students/export/pdf': ['./node_modules/pdfkit/js/standard-fonts/**/*'],
+  },
   async headers() {
     const supabaseHost = process.env.NEXT_PUBLIC_SUPABASE_URL
       ? new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).host
