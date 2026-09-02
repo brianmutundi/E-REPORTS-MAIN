@@ -1,0 +1,55 @@
+# Dependencies
+node_modules/
+
+# Next.js
+.next/
+out/
+build/
+next-env.d.ts
+tsconfig.tsbuildinfo
+
+# Environment & secrets — NEVER commit these
+# .env files contain live Supabase service-role keys and database credentials.
+.env
+.env.local
+.env.development
+.env.development.local
+.env.staging
+.env.staging.local
+.env.production
+.env.production.local
+.env.test
+.env.test.local
+
+# Keep the template (safe to commit — placeholder values only)
+!.env.example
+
+# Supabase local tooling
+supabase/.temp/
+supabase/.branches/
+supabase/.env
+
+# Development backup / scratch files — never commit
+*.bak
+*.backup
+.backup
+*_backup_*/
+supabase/migrations_backup_*/
+
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.vercel/
+
+# Misc
+.DS_Store
+Thumbs.db
+*.pem
+*.key
+*.p12
+.vscode/
+.idea/

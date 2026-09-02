@@ -1,0 +1,455 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ---------------------------------------------------------------------
+   E-REPORTS design system
+   Operate/read mode: calm, consistent, information-dense without clutter.
+   Brand = emerald. Semantic = emerald(success/action), amber(warning),
+   rose(error), slate(neutral).
+   --------------------------------------------------------------------- */
+
+@layer base {
+  :root {
+    --brand: #059669;          /* emerald-600 */
+    --brand-strong: #047857;   /* emerald-700 */
+    --brand-soft: #ecfdf5;     /* emerald-50 */
+    --canvas: #f8fafc;         /* slate-50 */
+    --surface: #ffffff;
+    --text: #0f172a;           /* slate-900 */
+    --text-soft: #64748b;      /* slate-500 */
+    --line: #e2e8f0;           /* slate-200 */
+    --danger: #e11d48;         /* rose-600 */
+  }
+
+  html {
+    min-width: 320px;
+    -webkit-text-size-adjust: 100%;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-slate-50 text-slate-900 antialiased;
+    font-family:
+      ui-sans-serif,
+      system-ui,
+      -apple-system,
+      'Segoe UI',
+      Roboto,
+      'Helvetica Neue',
+      Arial,
+      sans-serif;
+    min-height: 100svh;
+    overflow-x: hidden;
+  }
+
+  button,
+  a,
+  input,
+  select,
+  textarea {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* One consistent, accessible focus style across the product. */
+  :focus-visible {
+    outline: 2px solid var(--brand);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  ::selection {
+    background: var(--brand-soft);
+    color: #064e3b;
+  }
+
+  /* Quiet, palette-tinted scrollbars in scroll regions. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  /* Numeric data reads cleanly without column jitter. */
+  .num {
+    font-variant-numeric: tabular-nums;
+  }
+
+  @media (max-width: 640px) {
+    body {
+      font-size: 16px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/*
+ * Operate-mode component layer.
+ *
+ * Several server-rendered dashboard/admin/auth pages write against this
+ * vocabulary. The classes below are the design system: buttons, inputs,
+ * cards, notices, tables, report preview/print. Keep the vocabulary, never
+ * restyle pages ad hoc.
+ */
+@layer components {
+  .main {
+    @apply px-4 py-6 sm:px-6 sm:py-8;
+  }
+
+  .top {
+    @apply mb-6 flex flex-col gap-3 border-b border-slate-200 pb-5 sm:flex-row sm:items-center sm:justify-between;
+  }
+
+  .eyebrow {
+    @apply text-xs font-bold uppercase tracking-wider text-emerald-600;
+  }
+
+  .title {
+    @apply mt-0.5 text-2xl font-bold tracking-tight text-slate-900;
+  }
+
+  .section-title {
+    @apply text-lg font-semibold tracking-tight text-slate-900;
+  }
+
+  .muted {
+    @apply text-sm text-slate-500;
+  }
+
+  .card {
+    @apply rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm;
+  }
+
+  /* ---- Notices ------------------------------------------------------- */
+  .notice {
+    @apply mb-4 flex items-center gap-2 rounded-xl border px-4 py-3 text-sm font-medium;
+  }
+  .notice.success {
+    @apply border-emerald-200 bg-emerald-50 text-emerald-800;
+  }
+  .notice.error {
+    @apply border-rose-200 bg-rose-50 text-rose-800;
+  }
+  .notice.warning {
+    @apply border-amber-200 bg-amber-50 text-amber-900;
+  }
+
+  /* ---- Buttons ------------------------------------------------------- */
+  /* One primary, one secondary, one destructive. Identical structure so the
+     difference reads as importance, not shape. */
+  .btn,
+  .student-btn {
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-all hover:bg-emerald-700 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-60;
+  }
+  .btn.secondary,
+  .student-btn.secondary,
+  .button-secondary {
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition-all hover:bg-slate-50 active:scale-[0.98];
+  }
+  button.danger,
+  .danger {
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-semibold text-rose-700 shadow-sm transition-all hover:bg-rose-100 active:scale-[0.98];
+  }
+
+  .nav-signout {
+    @apply flex min-h-11 w-full items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold text-rose-400 transition-colors hover:bg-rose-950/40 disabled:pointer-events-none disabled:opacity-60;
+  }
+
+  /* ---- Forms --------------------------------------------------------- */
+  .inline-form {
+    @apply flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center;
+  }
+  /* Labeled field rows inside inline forms */
+  .inline-form .field-label {
+    @apply flex min-w-0 flex-1 flex-col gap-1.5 sm:min-w-48;
+  }
+  .inline-form input,
+  .inline-form select {
+    @apply w-full min-h-11 flex-1 rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-base text-slate-800 outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 sm:w-auto;
+  }
+
+  .formgrid,
+  .form-grid {
+    @apply grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 sm:items-end;
+  }
+  .formgrid input,
+  .formgrid select,
+  .form-grid input,
+  .form-grid select {
+    @apply w-full min-h-11 rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-base text-slate-800 outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20;
+  }
+
+  /* Shared single field + label. Wrapping label keeps the control
+     associated without a separate id/htmlFor pair. */
+  .field-label {
+    @apply block text-sm font-semibold text-slate-800;
+  }
+  .field-label input,
+  .field-label select {
+    @apply mt-1.5 block min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-base text-slate-900 outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20;
+  }
+
+  /* ---- Tables -------------------------------------------------------- */
+  .table {
+    @apply overflow-x-auto rounded-xl border border-slate-200;
+  }
+  .table .row {
+    @apply grid grid-cols-1 items-center gap-2 border-b border-slate-100 px-4 py-3 text-sm text-slate-700 last:border-b-0 sm:grid-cols-[repeat(auto-fit,minmax(120px,1fr))];
+  }
+  .table .row.header {
+    @apply bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-500;
+  }
+
+  /* Fixed layouts for tables with exactly N columns. */
+  .table.table-3col .row {
+    @apply sm:grid-cols-3;
+  }
+  .table.table-4col .row {
+    @apply sm:grid-cols-4;
+  }
+  .table.table-5col .row {
+    @apply sm:grid-cols-5;
+  }
+  .table .row input {
+    @apply min-h-11 w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20;
+  }
+
+  /* Contained, scrollable data table region with a sticky header.
+     Put the <table> inside this wrapper; give thead `sticky top-0 z-10`
+     and give pinned columns `sticky left-0` with their own backgrounds. */
+  .table-rail {
+    @apply max-h-[min(70vh,660px)] overflow-auto;
+  }
+
+  .actions {
+    @apply mt-4 flex flex-wrap items-center gap-2;
+  }
+  .actions-inline {
+    @apply flex flex-wrap items-center gap-2;
+  }
+
+  .checklist {
+    @apply grid grid-cols-1 gap-2 sm:grid-cols-2;
+  }
+  .checklist label {
+    @apply flex min-h-11 items-center gap-2.5 rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700;
+  }
+
+  .split {
+    @apply grid grid-cols-1 gap-6 lg:grid-cols-2;
+  }
+
+  .section-heading {
+    @apply mb-4 flex items-center justify-between gap-3;
+  }
+
+  .grid {
+    display: grid;
+    @apply gap-4;
+  }
+
+  .metric {
+    @apply mt-1 text-2xl font-bold text-slate-900;
+  }
+
+  .no-print {
+    @apply mb-4;
+  }
+
+  /* ---- Empty states -------------------------------------------------- */
+  .empty-state {
+    @apply flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-slate-300 bg-slate-50/70 px-4 py-10 text-center;
+  }
+  .empty-state .empty-state-icon {
+    @apply flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-slate-400 ring-1 ring-slate-200;
+  }
+  .empty-state .empty-state-title {
+    @apply text-sm font-semibold text-slate-700;
+  }
+  .empty-state .empty-state-body {
+    @apply max-w-md text-xs text-slate-500;
+  }
+
+  /* ---- Skeleton loading ---------------------------------------------- */
+  .skeleton {
+    @apply relative overflow-hidden rounded-lg bg-slate-200/70;
+  }
+  .skeleton::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.65), transparent);
+    animation: skeleton-shimmer 1.6s ease-in-out infinite;
+  }
+  @keyframes skeleton-shimmer {
+    100% {
+      transform: translateX(100%);
+    }
+  }
+
+  /* Report template configuration screen */
+  .template-layout {
+    @apply grid grid-cols-1 gap-6 lg:grid-cols-[1.4fr_1fr] lg:items-start;
+  }
+  .template-groups {
+    @apply mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2;
+  }
+  .template-group {
+    @apply rounded-xl border border-slate-200 p-4;
+  }
+  .template-group legend {
+    @apply px-1 text-xs font-bold uppercase tracking-wider text-slate-500;
+  }
+  .toggle-row {
+    @apply flex min-h-11 items-center justify-between gap-3 border-b border-slate-100 py-2 text-sm text-slate-700 last:border-b-0;
+  }
+
+  /* Report preview and printable report form */
+  .preview-card {
+    @apply bg-slate-50;
+  }
+  .report,
+  .preview-report {
+    @apply rounded-xl border border-slate-200 bg-white p-5;
+  }
+  .report-head {
+    @apply mb-4 space-y-1 border-b border-slate-200 pb-4 text-center;
+  }
+  .preview-school {
+    @apply text-lg font-bold text-slate-900;
+  }
+  .preview-contact {
+    @apply text-xs text-slate-500;
+  }
+  .report-address {
+    @apply text-xs text-slate-500;
+  }
+  .report-title {
+    @apply text-base font-bold text-slate-900;
+  }
+  .preview-meta,
+  .student-meta {
+    @apply mb-4 grid grid-cols-1 gap-3 border-b border-slate-100 pb-4 text-sm text-slate-700 sm:grid-cols-3;
+  }
+  .report-table {
+    @apply w-full border-collapse overflow-hidden rounded-lg border border-slate-200 text-left text-sm;
+  }
+  .report-table th,
+  .report-table td {
+    @apply border border-slate-200 px-3 py-2;
+  }
+  .report-table thead {
+    @apply bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-500;
+  }
+  .report-table tfoot th {
+    @apply bg-slate-50 text-right text-sm font-semibold text-slate-800;
+  }
+  .preview-summary {
+    @apply mt-4 flex flex-wrap justify-end gap-6 text-sm text-slate-700;
+  }
+  .preview-note {
+    @apply mt-4 border-t border-slate-100 pt-3 text-sm text-slate-700;
+  }
+  .comment-line {
+    @apply mt-2 h-8 border-b border-dashed border-slate-300;
+  }
+  .signature-block {
+    @apply mt-8;
+  }
+  .signature-row {
+    @apply mt-2 flex flex-wrap justify-between gap-x-8 gap-y-2 border-t border-slate-300 pt-2 text-sm font-medium text-slate-600;
+  }
+  .report-term-line {
+    @apply mt-4 text-sm text-slate-700;
+  }
+  .report-status {
+    @apply rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700;
+  }
+  .report-actions {
+    @apply mt-4 flex justify-end;
+  }
+
+  @media print {
+    .no-print {
+      display: none !important;
+    }
+  }
+}
+
+/* Mobile web-app polish: prevent flex/grid children from forcing horizontal overflow. */
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  img,
+  svg,
+  video,
+  canvas {
+    max-width: 100%;
+  }
+}
+
+@layer components {
+  @media (max-width: 767px) {
+    .main {
+      @apply px-3 py-4;
+    }
+
+    .card {
+      @apply p-4;
+    }
+
+    .title {
+      @apply text-[1.65rem] leading-tight;
+    }
+
+    .top {
+      @apply mb-4 gap-4 pb-4;
+    }
+  }
+}
+
+/* Report-form building blocks (print-oriented, kept separate from the
+   dashboard design system on purpose). */
+.assessment-components { margin-top: 12px; }
+.assessment-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.assessment-options .toggle-row { border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px 14px; background: #f8fafc; }
+.assessment-preview { margin-top: 14px; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px; background: #fff; }
+.assessment-preview-table { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(90px, 1fr); border: 1px solid #cbd5e1; overflow-x: auto; border-radius: 8px; }
+.assessment-preview-table span { padding: 9px 10px; font-size: 12px; font-weight: 700; border-right: 1px solid #cbd5e1; white-space: nowrap; }
+.assessment-preview-table span:last-child { border-right: 0; }
+@media (max-width: 700px) { .assessment-options { grid-template-columns: 1fr; } }
+
+.financial-information { margin-top: 16px; border: 1px solid #cbd5e1; border-radius: 6px; overflow: hidden; page-break-inside: avoid; }
+.financial-information-title { padding: 8px 10px; background: #eef3f8; border-bottom: 1px solid #cbd5e1; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; }
+.financial-information-row { display: grid; grid-template-columns: 180px 1fr; gap: 12px; align-items: center; min-height: 34px; padding: 6px 10px; border-bottom: 1px solid #e2e8f0; }
+.financial-information-row:last-child { border-bottom: 0; }
+.financial-line { text-align: left; letter-spacing: .08em; }
+@media (max-width: 767px) { .financial-information-row { grid-template-columns: 1fr; gap: 2px; } .financial-line { text-align: left; } }
+@media print { .financial-information { break-inside: avoid; page-break-inside: avoid; } }
