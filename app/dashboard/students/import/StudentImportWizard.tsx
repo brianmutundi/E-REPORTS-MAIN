@@ -87,7 +87,7 @@ export default function StudentImportWizard({ classId, className }: { classId: s
           <div>
             <h2 className="text-base font-bold text-slate-900">1. Download the template</h2>
             <p className="mt-1 text-sm text-slate-500">Required columns only: <span className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs">Adm No, Name</span>. The selected class is supplied by the system.</p>
-            <a href="/api/import/students/template" className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"><Download className="h-4 w-4" /> Download CSV template</a>
+            <a href="/api/import/students/template" download className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"><Download className="h-4 w-4" /> Download CSV template</a>
           </div>
           <div className="border-t border-slate-100 pt-5">
             <h2 className="text-base font-bold text-slate-900">2. Upload your file</h2>

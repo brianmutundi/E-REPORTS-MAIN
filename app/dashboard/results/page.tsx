@@ -243,20 +243,22 @@ export default async function ResultsPage({
             </p>
 
             <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
-              <Link
+              <a
                 href={`/api/results/export/xlsx?exam=${params.exam}&class=${params.class}${params.stream ? `&stream=${params.stream}` : ''}`}
                 className="btn"
+                download
               >
                 <FileSpreadsheet className="h-4 w-4" />
                 <span>Download Excel</span>
-              </Link>
-              <Link
+              </a>
+              <a
                 href={`/api/results/export/pdf?exam=${params.exam}&class=${params.class}${params.stream ? `&stream=${params.stream}` : ''}`}
                 className="btn secondary"
+                download
               >
                 <FileDown className="h-4 w-4" />
                 <span>Download PDF</span>
-              </Link>
+              </a>
             </div>
             <p className="text-[11px] text-slate-400 mt-3">
               {columns.length} Learning Areas · {results.length} Students · Missing scores shown as —

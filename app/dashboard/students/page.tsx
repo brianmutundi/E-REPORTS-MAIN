@@ -437,6 +437,7 @@ export default async function StudentsPage({
                 <a
                   className="student-btn secondary w-full sm:w-auto"
                   href={`/api/students/export/xlsx?class_id=${encodeURIComponent(selectedClass.id)}`}
+                  download
                 >
                   <FileSpreadsheet className="h-4 w-4" />
                   Export Excel
@@ -444,6 +445,7 @@ export default async function StudentsPage({
                 <a
                   className="student-btn secondary w-full sm:w-auto"
                   href={`/api/students/export/pdf?class_id=${encodeURIComponent(selectedClass.id)}`}
+                  download
                 >
                   <FileText className="h-4 w-4" />
                   Export PDF

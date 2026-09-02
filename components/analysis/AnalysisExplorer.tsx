@@ -42,6 +42,7 @@ export default function AnalysisExplorer({ analysis, initialGradeId, streamId }:
           <a
             href={`/api/analysis/export/pdf?exam=${analysis.examId}${selectedGrade ? `&class=${selectedGrade.classId}` : ''}${streamId ? `&stream=${streamId}` : ''}`}
             className="btn min-h-10 py-1.5 px-3"
+            download
           >
             <FileDown className="h-4 w-4" />
             <span>Download PDF</span>

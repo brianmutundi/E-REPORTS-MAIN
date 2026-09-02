@@ -130,7 +130,7 @@ export default function ResultsImportWizard({ exams, classes, classIdsByExam }: 
           <div>
             <h2 className="text-base font-bold text-slate-900">2. Download the template</h2>
             <p className="text-sm text-slate-500 mt-1">Generated for the selected exam and class — includes each enrolled student and the learning areas assigned to this examination.</p>
-            <a href={templateHref} className="mt-3 inline-flex items-center gap-2 min-h-11 px-4 py-2.5 rounded-xl border border-slate-300 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+            <a href={templateHref} download className="mt-3 inline-flex items-center gap-2 min-h-11 px-4 py-2.5 rounded-xl border border-slate-300 text-sm font-semibold text-slate-700 hover:bg-slate-50">
               <Download className="h-4 w-4" /> Download CSV template
             </a>
           </div>
