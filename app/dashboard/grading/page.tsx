@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { getDashboardSession } from '@/lib/supabase/session'
 import SuccessToast from '@/components/SuccessToast'
 import { friendlyDbRedirect } from '@/lib/db-errors'
-import { knecDefaultLevels, getTenantTotalGradingScale, defaultTotalGradingScale, type GradingMode, type GradeRule } from '@/lib/grading'
+import { knecDefaultLevels, getTenantTotalGradingScale, defaultTotalGradingScale, defaultRemarkBanks, REMARK_BANDS, type GradingMode, type GradeRule, type RemarkBanks, type RemarkRole } from '@/lib/grading'
 import GradingModeChooser from '@/components/grading/GradingModeChooser'
 
 const VALID_CODES_8 = ['EE1', 'EE2', 'ME1', 'ME2', 'AE1', 'AE2', 'BE1', 'BE2']
@@ -215,7 +215,38 @@ async function saveTotalGrading(formData: FormData) {
   redirect('/dashboard/grading?totalSaved=1')
 }
 
-export default async function GradingPage({ searchParams }: { searchParams: Promise<{ saved?: string; error?: string; restored4?: string; restored8?: string; totalSaved?: string }> }) {
+async function saveRemarkBank(formData: FormData) {
+  'use server'
+  const { supabase, user, tenantId } = await getDashboardSession()
+  if (!user) redirect('/login')
+  if (!tenantId) redirect('/dashboard/grading?error=' + encodeURIComponent('Error|No school is linked to this account.'))
+
+  const role = String(formData.get('bank_role') || '') as RemarkRole
+  if (role !== 'class_teacher' && role !== 'principal') redirect('/dashboard/grading?error=' + encodeURIComponent('Error|Invalid remark bank.'))
+
+  const banks = REMARK_BANDS.map((band, i) => ({
+    band: band.key,
+    text: String(formData.get(`bank_${i}`) || '').trim(),
+    sort_order: i,
+  }))
+
+  const { error } = await supabase.rpc('save_report_remark_bank', { p_tenant_id: tenantId, p_role: role, p_banks: JSON.stringify(banks) })
+  if (error && (error.code as string) !== 'PGRST202' && !/cannot find the function|does not exist/i.test(error.message ?? '')) {
+    redirect('/dashboard/grading?error=' + encodeURIComponent(friendlyDbRedirect(error)))
+  }
+  // Fallback: direct upsert when the RPC is not yet applied.
+  if (error && ((error.code as string) === 'PGRST202' || /cannot find the function|does not exist/i.test(error.message ?? ''))) {
+    for (const b of banks) {
+      await supabase.from('report_remark_banks').upsert({ tenant_id: tenantId, role, band: b.band, text: b.text, sort_order: b.sort_order }, { onConflict: 'tenant_id,role,band' })
+    }
+  }
+
+  revalidatePath('/dashboard/grading')
+  revalidatePath('/dashboard/reports')
+  redirect('/dashboard/grading?remarkSaved=1')
+}
+
+export default async function GradingPage({ searchParams }: { searchParams: Promise<{ saved?: string; error?: string; restored4?: string; restored8?: string; totalSaved?: string; remarkSaved?: string }> }) {
   const params = await searchParams
   const { supabase, user, tenantId } = await getDashboardSession()
   if (!user) return <main className="main"><p>Please sign in.</p></main>
@@ -275,6 +306,20 @@ export default async function GradingPage({ searchParams }: { searchParams: Prom
 
   const rows = Array.from({ length: mode === '8' ? 8 : 4 }, (_, i) => levels[i])
 
+  const savedBanks: RemarkBanks = await (async () => {
+    const { data } = await supabase.from('report_remark_banks').select('role,band,text,sort_order').eq('tenant_id', tenantId)
+    if (data && data.length) {
+      const split = (role: RemarkRole) => (data as any[])
+        .filter(r => r.role === role)
+        .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+        .map(r => ({ band: r.band, text: r.text ?? '', sort_order: r.sort_order ?? 0 }))
+      const teacher = split('class_teacher'); const principal = split('principal')
+      if (teacher.length && principal.length) return { class_teacher: teacher, principal }
+    }
+    return defaultRemarkBanks()
+  })()
+  const bankBy = (role: RemarkRole) => new Map(savedBanks[role].map(b => [b.band, b.text]))
+
   return (
     <main className="main" style={{ maxWidth: 1080, margin: '0 auto' }}>
       <div className="top">
@@ -292,6 +337,7 @@ export default async function GradingPage({ searchParams }: { searchParams: Prom
       {params.error && (() => { const idx = params.error.indexOf('|'); return idx > -1 ? <div className="notice error"><span className="font-semibold">{params.error.slice(0, idx)}</span><span className="block text-xs opacity-80 mt-0.5">{params.error.slice(idx + 1)}</span></div> : <div className="notice error">{params.error}</div> })()}
       {params.saved && <SuccessToast message="Grading configuration saved" />}
       {params.totalSaved && <SuccessToast message="Total Aggregate scale saved" />}
+      {params.remarkSaved && <SuccessToast message="Remark bank saved" />}
       {(params.restored8 || params.restored4) && <SuccessToast message={params.restored8 ? 'Restored KNEC 8-level defaults' : 'Restored 4-level defaults'} />}
 
       <div style={{ marginBottom: 4 }}>
@@ -394,6 +440,54 @@ export default async function GradingPage({ searchParams }: { searchParams: Prom
           <button className="btn" type="submit" name="intent" value="save-total">Save Total Aggregate Scale</button>
         </div>
       </form>
+
+      <div className="card" style={{ marginTop: 18 }}>
+        <div className="section-heading">
+          <div>
+            <h2 className="section-title">Report Remark Banks</h2>
+            <p className="muted">
+              These narrative remarks appear as fixed text on every report. They are determined by the learner&apos;s overall Total/Average across all learning areas — never by a single subject&apos;s level — and are edited centrally here (not per learner or per report). The Class Teacher and Head Teacher banks are kept separate.
+            </p>
+          </div>
+        </div>
+
+        <h3 className="section-title" style={{ fontSize: 14, marginTop: 4, marginBottom: 4 }}>Class Teacher Remarks</h3>
+        <form action={saveRemarkBank} className="table" style={{ overflowX: 'auto' }}>
+          <input type="hidden" name="bank_role" value="class_teacher" />
+          <div className="row header" style={{ gridTemplateColumns: '140px 1fr' }}>
+            <span>Overall band</span><span>Default remark (narrative)</span>
+          </div>
+          {REMARK_BANDS.map((band, i) => (
+            <div key={band.key} className="row" style={{ gridTemplateColumns: '140px 1fr' }}>
+              <span className="font-semibold" style={{ alignSelf: 'center' }}>{band.label}</span>
+              <textarea name={`bank_${i}`} defaultValue={bankBy('class_teacher').get(band.key) ?? ''} aria-label={`Class teacher ${band.label} remark`} style={{ minHeight: 56, borderRadius: 10, border: '1px solid var(--line)', padding: '8px 10px', fontSize: 13 }} />
+            </div>
+          ))}
+          <div className="actions-inline" style={{ marginTop: 12 }}>
+            <button className="btn" type="submit">Save Class Teacher Bank</button>
+          </div>
+        </form>
+
+        <h3 className="section-title" style={{ fontSize: 14, marginTop: 24, marginBottom: 4 }}>Head Teacher Remarks</h3>
+        <form action={saveRemarkBank} className="table" style={{ overflowX: 'auto' }}>
+          <input type="hidden" name="bank_role" value="principal" />
+          <div className="row header" style={{ gridTemplateColumns: '140px 1fr' }}>
+            <span>Overall band</span><span>Default remark (narrative)</span>
+          </div>
+          {REMARK_BANDS.map((band, i) => (
+            <div key={band.key} className="row" style={{ gridTemplateColumns: '140px 1fr' }}>
+              <span className="font-semibold" style={{ alignSelf: 'center' }}>{band.label}</span>
+              <textarea name={`bank_${i}`} defaultValue={bankBy('principal').get(band.key) ?? ''} aria-label={`Head teacher ${band.label} remark`} style={{ minHeight: 56, borderRadius: 10, border: '1px solid var(--line)', padding: '8px 10px', fontSize: 13 }} />
+            </div>
+          ))}
+          <div className="actions-inline" style={{ marginTop: 12 }}>
+            <button className="btn" type="submit">Save Head Teacher Bank</button>
+          </div>
+        </form>
+        <p className="muted" style={{ marginTop: 10 }}>
+          Remarks are matched to a learner&apos;s overall band (Excellent ≥ 75%, Very good ≥ 50%, Good ≥ 40%, Improving ≥ 30%, Needs support &lt; 30%) computed from the report&apos;s overall Total/Average.
+        </p>
+      </div>
     </main>
   )
 }

@@ -367,6 +367,95 @@ export function remarkForLevel(overallLevel: string | null | undefined, scale: r
  * reuses the Learning Area percentage scale. The returned scale is fully
  * editable via the grading settings page.
  */
+// ─────────────────────────────────────────────────────────────
+// Report remark banks (grading-system level)
+// ─────────────────────────────────────────────────────────────
+//
+// Class Teacher and Principal remarks are plain NARRATIVE templates keyed to a
+// learner's overall performance band. They use PLAIN band labels (Not the
+// EE/ME/AE/BE performance scale) and are edited centrally in the grading system,
+// then rendered as fixed read-only text on every report.
+
+export type RemarkBand = 'excellent' | 'very_good' | 'good' | 'improving' | 'needs_support'
+export type RemarkRole = 'class_teacher' | 'principal'
+
+export const REMARK_BANDS: { key: RemarkBand; label: string }[] = [
+  { key: 'excellent', label: 'Excellent' },
+  { key: 'very_good', label: 'Very good' },
+  { key: 'good', label: 'Good' },
+  { key: 'improving', label: 'Improving' },
+  { key: 'needs_support', label: 'Needs support' },
+]
+
+export type RemarkBankEntry = { band: RemarkBand; text: string; sort_order: number }
+
+export type RemarkBanks = { class_teacher: RemarkBankEntry[]; principal: RemarkBankEntry[] }
+
+/**
+ * Default narrative remark templates (best→worst). The principal bank stays more
+ * general/institutional, deliberately not repeating the teacher's observations.
+ */
+export const DEFAULT_REMARK_BANKS: RemarkBanks = {
+  class_teacher: [
+    { band: 'excellent', text: 'Excellent progress this term. You have demonstrated strong understanding of the learning areas and consistently participated well in learning activities. Keep up the good work.', sort_order: 0 },
+    { band: 'very_good', text: 'Very good progress. You are developing your competencies well and showing a positive attitude towards learning. Continue working consistently.', sort_order: 1 },
+    { band: 'good', text: 'Good progress this term. You have demonstrated steady improvement and satisfactory participation. Put more effort into areas that require improvement.', sort_order: 2 },
+    { band: 'improving', text: 'You have shown encouraging improvement this term. Continue practising regularly and participate actively in learning activities to strengthen your competencies.', sort_order: 3 },
+    { band: 'needs_support', text: 'You are making progress but require more practice and support in some learning areas. Remain focused and seek assistance whenever you experience difficulties.', sort_order: 4 },
+  ],
+  principal: [
+    { band: 'excellent', text: 'Excellent performance and progress. Maintain the same commitment and continue developing your competencies.', sort_order: 0 },
+    { band: 'very_good', text: 'Very good progress. Keep up the positive attitude towards learning and strive for continuous improvement.', sort_order: 1 },
+    { band: 'good', text: 'Good progress. Continue working consistently and make greater effort in areas requiring improvement.', sort_order: 2 },
+    { band: 'improving', text: 'Encouraging progress. With continued effort, practice and support, greater achievement can be realised.', sort_order: 3 },
+    { band: 'needs_support', text: 'More effort and consistent practice are required. The learner is encouraged to remain focused and make use of available support.', sort_order: 4 },
+  ],
+}
+
+export function defaultRemarkBanks(): RemarkBanks {
+  return structuredClone(DEFAULT_REMARK_BANKS)
+}
+
+/**
+ * Plain percentage boundaries that map a learner's OVERALL percentage to a
+ * narrative remark band. These are deliberately independent of the EE/ME/AE/BE
+ * performance scale — remarks are narrative, not graded on that scale.
+ */
+export function remarkBandForPercent(percent: number | null | undefined, banks: RemarkBanks, role: RemarkRole): string {
+  const bank = banks[role]
+  if (!bank?.length || percent === null || percent === undefined || !Number.isFinite(percent)) return ''
+  let key: RemarkBand
+  if (percent >= 75) key = 'excellent'
+  else if (percent >= 50) key = 'very_good'
+  else if (percent >= 40) key = 'good'
+  else if (percent >= 30) key = 'improving'
+  else key = 'needs_support'
+  return bank.find(b => b.band === key)?.text ?? ''
+}
+
+/**
+ * Loads the tenant's remark banks, seeding them from the defaults on first use.
+ * Returns { class_teacher: [...], principal: [...] }, each with 5 plain bands.
+ */
+export async function getTenantRemarkBanks(tenantId: string): Promise<RemarkBanks> {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('report_remark_banks')
+    .select('role,band,text,sort_order')
+    .eq('tenant_id', tenantId)
+  if (!error && data && data.length) {
+    const split = (role: RemarkRole): RemarkBankEntry[] =>
+      (data as any[])
+        .filter(r => r.role === role)
+        .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
+        .map(r => ({ band: r.band as RemarkBand, text: r.text ?? '', sort_order: r.sort_order ?? 0 }))
+    const teacher = split('class_teacher')
+    const principal = split('principal')
+    if (teacher.length && principal.length) return { class_teacher: teacher, principal }
+  }
+  return defaultRemarkBanks()
+}
+
 export async function getTenantTotalGradingScale(tenantId: string): Promise<TotalGradingScale | null> {
   const supabase = await createClient()
   const { data: template } = await supabase.from('report_templates').select('id').eq('tenant_id', tenantId).eq('is_default', true).maybeSingle()
