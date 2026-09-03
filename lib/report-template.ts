@@ -16,48 +16,61 @@ export type ReportTemplate = {
 }
 
 export const defaultAssessmentComponents: AssessmentComponents = {
-  // Backwards-compatible with the existing single-examination report: the
-  // selected examination is treated as the end-term/current assessment and
-  // the existing mean is still available until the administrator chooses a
-  // different configuration.
-  midTerm: false,
+  // All assessment components are now compulsory: every report renders the
+  // Mid Term, End Term and Average columns (choice-based toggles removed).
+  midTerm: true,
   endTerm: true,
   average: true,
 }
 
 export const defaultReportTemplate: ReportTemplate = {
-  school: { name: true, logo: true, contact: false },
-  student: { name: true, admissionNo: true, className: true, stream: false },
+  // Every report component is now compulsory (no choice-based toggles), so
+  // the visibility flags are all forced on both in the seed and at
+  // normalization time. Old stored templates with sections turned off are
+  // upgraded to show everything.
+  school: { name: true, logo: true, contact: true },
+  student: { name: true, admissionNo: true, className: true, stream: true },
   examination: { name: true, academicYear: true, term: true },
   results: { learningArea: true, marks: true, grade: true, gradeDescription: true, total: true, average: true, position: true },
-  additional: { teacherComment: false, overallComment: false, signatureArea: true },
+  additional: { teacherComment: true, overallComment: true, signatureArea: true },
   assessmentComponents: defaultAssessmentComponents,
 }
+
+/**
+ * Sensible default teacher/principal remark banks, used both as the editable
+ * starting values in Report Settings and as the runtime fallback when a
+ * school has not yet saved remarks. They are fully editable by the user and
+ * remain linked to the learner's achievement level (best→worst order).
+ */
+export const DEFAULT_TEACHER_REMARKS = [
+  'Excellent progress — outstanding performance',
+  'Very good progress — keep it up',
+  'Good progress — strive for better',
+  'Needs improvement — extra effort required',
+]
+
+export const DEFAULT_PRINCIPAL_REMARKS = [
+  'Promoted to the next level with distinction',
+  'Promoted to the next level',
+  'Overall performance satisfactory — needs improvement',
+  'Needs closer support',
+]
 
 function bool(value: unknown, fallback: boolean) {
   return typeof value === 'boolean' ? value : fallback
 }
 
 export function normalizeAssessmentComponents(value: unknown): AssessmentComponents {
-  const v = (value && typeof value === 'object' ? value : {}) as Record<string, unknown>
-  const components = {
-    midTerm: bool(v.midTerm, defaultAssessmentComponents.midTerm),
-    endTerm: bool(v.endTerm, defaultAssessmentComponents.endTerm),
-    average: bool(v.average, defaultAssessmentComponents.average),
-  }
-  return components
+  void value
+  // Assessment components are compulsory — always all three columns.
+  return { midTerm: true, endTerm: true, average: true }
 }
 
 export function normalizeReportTemplate(value: unknown): ReportTemplate {
-  const v = (value && typeof value === 'object' ? value : {}) as Record<string, any>
-  return {
-    school: { name: bool(v.school?.name, true), logo: bool(v.school?.logo, true), contact: bool(v.school?.contact, false) },
-    student: { name: bool(v.student?.name, true), admissionNo: bool(v.student?.admissionNo, true), className: bool(v.student?.className, true), stream: bool(v.student?.stream, false) },
-    examination: { name: bool(v.examination?.name, true), academicYear: bool(v.examination?.academicYear, true), term: bool(v.examination?.term, true) },
-    results: { learningArea: bool(v.results?.learningArea, true), marks: bool(v.results?.marks, true), grade: bool(v.results?.grade, true), gradeDescription: bool(v.results?.gradeDescription, true), total: bool(v.results?.total, true), average: bool(v.results?.average, true), position: bool(v.results?.position, true) },
-    additional: { teacherComment: bool(v.additional?.teacherComment, false), overallComment: bool(v.additional?.overallComment, false), signatureArea: bool(v.additional?.signatureArea, true) },
-    assessmentComponents: normalizeAssessmentComponents(v.assessmentComponents),
-  }
+  void value
+  // Choice-based component toggles are removed: every component is compulsory,
+  // so the normalized template always shows everything on every report.
+  return structuredClone(defaultReportTemplate)
 }
 
 export const templateFields: { section: keyof Omit<ReportTemplate, 'assessmentComponents'>; key: string; label: string }[] = [

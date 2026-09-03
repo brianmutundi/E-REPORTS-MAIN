@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { getDashboardSession } from '@/lib/supabase/session'
 import SuccessToast from '@/components/SuccessToast'
 import { friendlyDbRedirect } from '@/lib/db-errors'
-import { knecDefaultLevels, type GradingMode, type GradeRule } from '@/lib/grading'
+import { knecDefaultLevels, getTenantTotalGradingScale, defaultTotalGradingScale, type GradingMode, type GradeRule } from '@/lib/grading'
 import GradingModeChooser from '@/components/grading/GradingModeChooser'
 
 const VALID_CODES_8 = ['EE1', 'EE2', 'ME1', 'ME2', 'AE1', 'AE2', 'BE1', 'BE2']
@@ -166,7 +166,56 @@ async function restoreKnec(formData: FormData) {
   redirect('/dashboard/grading?' + (mode === '8' ? 'restored8=1' : 'restored4=1'))
 }
 
-export default async function GradingPage({ searchParams }: { searchParams: Promise<{ saved?: string; error?: string; restored4?: string; restored8?: string }> }) {
+async function saveTotalGrading(formData: FormData) {
+  'use server'
+  const { supabase, user, tenantId } = await getDashboardSession()
+  if (!user) redirect('/login')
+  if (!tenantId) redirect('/dashboard/grading?error=' + encodeURIComponent('Error|No school is linked to this account.'))
+
+  const refRaw = String(formData.get('total_ref_max') || '').trim()
+  const referenceMaximum = Number(refRaw)
+  if (!Number.isFinite(referenceMaximum) || referenceMaximum <= 0) {
+    redirect('/dashboard/grading?error=' + encodeURIComponent('Total Aggregate|The aggregate maximum must be a positive number.'))
+  }
+
+  const rows = Array.from({ length: 4 }, (_, i) => ({
+    level_code: String(formData.get(`total_${i}_code`) || '').trim().toUpperCase(),
+    min_score: Number(String(formData.get(`total_${i}_min`) || '').trim()),
+    max_score: Number(String(formData.get(`total_${i}_max`) || '').trim()),
+    description: String(formData.get(`total_${i}_desc`) || '').trim(),
+    sort_order: i,
+  }))
+
+  for (const r of rows) {
+    if (!r.level_code) { redirect('/dashboard/grading?error=' + encodeURIComponent('Total Aggregate|Every level needs a code (e.g. EE).')); }
+    if (!Number.isFinite(r.min_score) || !Number.isFinite(r.max_score) || r.min_score < 0 || r.min_score > r.max_score || r.max_score > referenceMaximum) {
+      redirect('/dashboard/grading?error=' + encodeURIComponent('Total Aggregate|Level "' + r.level_code + '" has an invalid range (0 ≤ min ≤ max ≤ ' + referenceMaximum + ').'))
+    }
+  }
+
+  // Resolve the tenant's default report template (create one if missing).
+  const { data: template } = await supabase.from('report_templates').select('id').eq('tenant_id', tenantId).eq('is_default', true).maybeSingle()
+  let templateId = template?.id
+  if (!templateId) {
+    const { data: created } = await supabase.from('report_templates').insert({ tenant_id: tenantId, name: 'Default Report Form', template_json: {}, is_default: true }).select('id').single()
+    templateId = created?.id
+  }
+  if (!templateId) redirect('/dashboard/grading?error=' + encodeURIComponent('Error|Could not resolve the report template.'))
+
+  const { error } = await supabase.rpc('save_total_grading_levels', { p_template_id: templateId, p_reference_maximum: referenceMaximum, p_rows: rows })
+  if (error && (error.code as string) !== 'PGRST202' && !/cannot find the function|does not exist/i.test(error.message ?? '')) {
+    redirect('/dashboard/grading?error=' + encodeURIComponent(friendlyDbRedirect(error)))
+  }
+
+  revalidatePath('/dashboard/grading')
+  revalidatePath('/dashboard/results')
+  revalidatePath('/dashboard/reports')
+  revalidatePath('/dashboard/analysis')
+  revalidatePath('/dashboard/reports/template')
+  redirect('/dashboard/grading?totalSaved=1')
+}
+
+export default async function GradingPage({ searchParams }: { searchParams: Promise<{ saved?: string; error?: string; restored4?: string; restored8?: string; totalSaved?: string }> }) {
   const params = await searchParams
   const { supabase, user, tenantId } = await getDashboardSession()
   if (!user) return <main className="main"><p>Please sign in.</p></main>
@@ -218,6 +267,12 @@ export default async function GradingPage({ searchParams }: { searchParams: Prom
   }
   if (!levels.length) levels = knecDefaultLevels(mode)
 
+  // Total Aggregate grading scale (separate system with its own raws-mark
+  // tiers). Defaults auto-load via getTenantTotalGradingScale.
+  const totalScale = await getTenantTotalGradingScale(tenantId)
+  const totalRef = totalScale?.referenceMaximum ?? defaultTotalGradingScale().referenceMaximum
+  const totalRules = totalScale?.rules?.length ? totalScale.rules : defaultTotalGradingScale(totalRef).rules
+
   const rows = Array.from({ length: mode === '8' ? 8 : 4 }, (_, i) => levels[i])
 
   return (
@@ -236,6 +291,7 @@ export default async function GradingPage({ searchParams }: { searchParams: Prom
 
       {params.error && (() => { const idx = params.error.indexOf('|'); return idx > -1 ? <div className="notice error"><span className="font-semibold">{params.error.slice(0, idx)}</span><span className="block text-xs opacity-80 mt-0.5">{params.error.slice(idx + 1)}</span></div> : <div className="notice error">{params.error}</div> })()}
       {params.saved && <SuccessToast message="Grading configuration saved" />}
+      {params.totalSaved && <SuccessToast message="Total Aggregate scale saved" />}
       {(params.restored8 || params.restored4) && <SuccessToast message={params.restored8 ? 'Restored KNEC 8-level defaults' : 'Restored 4-level defaults'} />}
 
       <div style={{ marginBottom: 4 }}>
@@ -297,6 +353,45 @@ export default async function GradingPage({ searchParams }: { searchParams: Prom
         </p>
         <div className="actions-inline" style={{ marginTop: 16 }}>
           <button className="btn" type="submit" name="intent" value="save">Save Grading Configuration</button>
+        </div>
+      </form>
+
+      <form action={saveTotalGrading} className="card" style={{ marginTop: 18 }}>
+        <div className="section-heading">
+          <div>
+            <h2 className="section-title">Total Aggregate Scale</h2>
+            <p className="muted">
+              Separate grading tiers for the TOTAL aggregate score (raw marks such as 0–700). These differ from the Learning Area percentage scale because totals use a much larger numerical range.               Sensible defaults load automatically and remain fully editable.
+            </p>
+          </div>
+        </div>
+
+        <label className="field-label" style={{ display: 'block', marginBottom: 12 }}>Aggregate maximum (reference)
+          <input name="total_ref_max" type="number" min="1" step="1" defaultValue={String(totalRef)} aria-label="Aggregate maximum" />
+        </label>
+
+        <div className="table" style={{ overflowX: 'auto' }}>
+          <div className="row header" style={{ gridTemplateColumns: '86px 1.4fr 1fr 1fr' }}>
+            <span>Code</span><span>Description</span><span>Minimum (marks)</span><span>Maximum (marks)</span>
+          </div>
+          {Array.from({ length: 4 }, (_, i) => {
+            const l = totalRules[i]
+            return (
+              <div key={i} className="row" style={{ gridTemplateColumns: '86px 1.4fr 1fr 1fr' }}>
+                <input name={`total_${i}_code`} aria-label={`Total level ${i + 1} code`} defaultValue={l?.grade ?? ''} placeholder={`L${i + 1}`} />
+                <input name={`total_${i}_desc`} aria-label={`Total level ${i + 1} description`} defaultValue={l?.description ?? ''} placeholder="Level description" />
+                <input name={`total_${i}_min`} aria-label={`Total level ${i + 1} minimum`} type="number" min="0" step="0.01" defaultValue={l?.min ?? ''} />
+                <input name={`total_${i}_max`} aria-label={`Total level ${i + 1} maximum`} type="number" min="0" step="0.01" defaultValue={l?.max ?? ''} />
+              </div>
+            )
+          })}
+        </div>
+
+        <p className="muted" style={{ marginTop: 12 }}>
+          Bands must cover the full 0 to {String(totalRef)} range with no overlaps or gaps. Each raw aggregate total maps to exactly one level.
+        </p>
+        <div className="actions-inline" style={{ marginTop: 16 }}>
+          <button className="btn" type="submit" name="intent" value="save-total">Save Total Aggregate Scale</button>
         </div>
       </form>
     </main>

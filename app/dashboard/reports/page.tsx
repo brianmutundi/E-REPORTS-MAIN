@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { getConfiguredAssessmentResults } from '@/lib/results'
-import { getReportTenant, normalizeReportTemplate } from '@/lib/report-template'
+import { getReportTenant, normalizeReportTemplate, DEFAULT_TEACHER_REMARKS, DEFAULT_PRINCIPAL_REMARKS } from '@/lib/report-template'
 import { getTenantGradingScale, remarkForLevel } from '@/lib/grading'
 import { getDashboardSession } from '@/lib/supabase/session'
 import { getScopeStreams, getScopeExams, type ScopeExam } from '@/lib/scope'
@@ -48,8 +48,8 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
       ])
     : [{ data: null }, null, { teacher: [], principal: [] }]
   const results = configured?.rows ?? []
-  const teacherRemarks = remarkBanks?.teacher ?? []
-  const principalRemarks = remarkBanks?.principal ?? []
+  const teacherRemarks = remarkBanks?.teacher?.length ? remarkBanks.teacher : DEFAULT_TEACHER_REMARKS
+  const principalRemarks = remarkBanks?.principal?.length ? remarkBanks.principal : DEFAULT_PRINCIPAL_REMARKS
   const selected = params.student ? results.find(r => r.studentId === params.student) : undefined
   const exam = exams?.find(e => e.id === params.exam)
   const className = classes?.find(c => c.id === params.class)?.name
@@ -219,24 +219,16 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
           </div>
         ) : null}
 
-        {template.additional.teacherComment && (
-          <div className="preview-note report-remark">
-            <b>Remark (Class teacher)</b>
-            <p className="remark-text">{remarkForLevel(selected.overallLevel, gradingScale, teacherRemarks) || '____________________________'}</p>
+        <div className="signature-block">
+          <div className="signature-role">
+            <div className="signature-line"><span>Class Teacher: ({classTeacherName || '________________'})</span><span>Sign: ________</span><span>Date: ______</span></div>
+            <div className="signature-remark"><span className="signature-remark-label">Remark:</span><span>{remarkForLevel(selected.overallLevel, gradingScale, teacherRemarks) || '____________________________'}</span></div>
           </div>
-        )}
-        {template.additional.overallComment && (
-          <div className="preview-note report-remark">
-            <b>Remark (Principal)</b>
-            <p className="remark-text">{remarkForLevel(selected.overallLevel, gradingScale, principalRemarks) || '____________________________'}</p>
+          <div className="signature-role">
+            <div className="signature-line"><span>Principal: ({classPrincipalName || '________________'})</span><span>Sign: ________</span><span>Date: ______</span></div>
+            <div className="signature-remark"><span className="signature-remark-label">Remark:</span><span>{remarkForLevel(selected.overallLevel, gradingScale, principalRemarks) || '____________________________'}</span></div>
           </div>
-        )}
-        {template.additional.signatureArea && (
-          <div className="signature-block">
-            <div className="signature-row"><span>Class Teacher&apos;s Name: {classTeacherName || '________________'}</span><span>Sign: ____________</span><span>Date: ____________</span></div>
-            <div className="signature-row"><span>Principal&apos;s Name: {classPrincipalName || '________________'}</span><span>Sign: ____________</span><span>Date: ____________</span></div>
-          </div>
-        )}
+        </div>
         <div className="report-actions no-print"><PrintButton href={`/api/reports/pdf?exam=${params.exam}&class=${params.class}${params.stream ? `&stream=${params.stream}` : ''}&student=${selected.studentId}`} /></div>
       </section>
     )}

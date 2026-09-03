@@ -2,13 +2,9 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { getDashboardSession } from '@/lib/supabase/session'
-import { normalizeAssessmentComponents, normalizeReportTemplate } from '@/lib/report-template'
-import AssessmentComponentsEditor from './AssessmentComponentsEditor'
+import { DEFAULT_TEACHER_REMARKS, DEFAULT_PRINCIPAL_REMARKS, normalizeReportTemplate } from '@/lib/report-template'
 import SuccessToast from '@/components/SuccessToast'
 import { friendlyDbRedirect } from '@/lib/db-errors'
-
-const DEFAULT_TEACHER_REMARKS = ['Excellent progress', 'Very good progress', 'Good progress', 'Needs improvement']
-const DEFAULT_PRINCIPAL_REMARKS = ['Promoted to the next level', 'Keep up the good work', 'Continue working hard', 'Needs closer support']
 
 function rowsFromForm(formData: FormData, prefix: string) {
   return Array.from({ length: 8 }, (_, i) => String(formData.get(`${prefix}_${i}`) || '').trim()).filter(Boolean)
@@ -25,14 +21,9 @@ async function saveConfiguration(formData: FormData) {
   if (teacherRemarks.length < 4 || teacherRemarks.length > 8) redirect('/dashboard/reports/template/configuration?error=' + encodeURIComponent('Error|Class teacher remarks must contain 4 to 8 rows.'))
   if (principalRemarks.length < 4 || principalRemarks.length > 8) redirect('/dashboard/reports/template/configuration?error=' + encodeURIComponent('Error|Principal remarks must contain 4 to 8 rows.'))
 
-  const assessmentComponents = {
-    midTerm: formData.get('assessment_mid_term') === 'on',
-    endTerm: formData.get('assessment_end_term') === 'on',
-    average: formData.get('assessment_average') === 'on',
-  }
-  if (!assessmentComponents.midTerm && !assessmentComponents.endTerm && !assessmentComponents.average) {
-    redirect('/dashboard/reports/template/configuration?error=' + encodeURIComponent('Error|Select at least one assessment component.'))
-  }
+  // Assessment components are now compulsory — the report always shows Mid
+  // Term, End Term and Average score columns.
+  const assessmentComponents = { midTerm: true, endTerm: true, average: true }
 
   // Atomic save: template, config and both remark lists change in a single
   // transaction, so concurrent or interrupted saves cannot leave the report
@@ -99,8 +90,6 @@ export default async function ReportTemplateConfigurationPage({ searchParams }: 
   ])
   const teacherRows = teachers?.map(r => r.remark) ?? DEFAULT_TEACHER_REMARKS
   const principalRows = principals?.map(r => r.remark) ?? DEFAULT_PRINCIPAL_REMARKS
-  const templateValue = normalizeReportTemplate(template?.template_json)
-  const assessmentComponents = normalizeAssessmentComponents(templateValue.assessmentComponents)
 
   return <main className="main" style={{ maxWidth: 1100, margin: '0 auto' }}>
     <div className="top"><div><div className="eyebrow">Report template configuration</div><h1 className="title">Report Settings</h1><p className="muted">Configure term dates, assessment components and selectable remarks used by report forms.</p></div><Link className="btn secondary" href="/dashboard/reports/template">Back to template</Link></div>
@@ -111,10 +100,9 @@ export default async function ReportTemplateConfigurationPage({ searchParams }: 
         <div className="form-grid"><label className="field-label">Opening date<input type="date" name="opening_date" defaultValue={config?.opening_date ?? ''}/></label><label className="field-label">Closing date<input type="date" name="closing_date" defaultValue={config?.closing_date ?? ''}/></label></div>
 
         <h2 style={{ marginTop: 24 }}>Assessment Components</h2>
-        <p className="muted">Select the assessment results you want displayed on this report form.</p>
-        <AssessmentComponentsEditor initial={assessmentComponents} />
+        <p className="muted">All assessment components are compulsory and always appear on every report: Mid Term, End Term and Average.</p>
 
-        <h2 style={{ marginTop: 28 }}>Remarks</h2><p className="muted">Each enabled remark list must contain between 4 and 8 options.</p>
+        <h2 style={{ marginTop: 28 }}>Remarks</h2><p className="muted">Each remark list contains between 4 and 8 options. They load sensible defaults and are fully editable, linking to the learner&apos;s achievement level.</p>
         <label className="toggle-row"><span>Enable class teacher remarks</span><input type="checkbox" name="teacher_enabled" defaultChecked={config?.teacher_remarks_enabled ?? true}/></label>
         <div className="table">{Array.from({ length: 8 }, (_, i) => <div className="row" key={`teacher-${i}`}><span>{i + 1}</span><input name={`teacher_${i}`} defaultValue={teacherRows[i] ?? ''} placeholder={i < 4 ? 'Required remark' : 'Optional remark'}/></div>)}</div>
         <label className="toggle-row" style={{ marginTop: 20 }}><span>Enable principal remarks</span><input type="checkbox" name="principal_enabled" defaultChecked={config?.principal_remarks_enabled ?? true}/></label>

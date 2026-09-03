@@ -207,6 +207,32 @@ export function rankCompetitive<T>(
 // ─────────────────────────────────────────────────────────────
 
 /**
+ * Sensible default TOTAL AGGREGATE grading tiers, expressed as RAW marks
+ * against a reference maximum (default 700 — a typical 7 × 100 aggregate).
+ *
+ * The Total Aggregate system is deliberately SEPARATE from the Learning Area
+ * system: totals use a larger numerical range (raw marks, e.g. 0–700) whereas
+ * learning areas use 0–100 per subject, so they cannot share the same tier
+ * values. These defaults cover the full 0..referenceMaximum range with the
+ * same KNEC 4-level percentage boundaries as the learning-area default:
+ *   EE ≥ 75%, ME ≥ 41%, AE ≥ 21%, BE < 21%
+ * expressed in raw marks, and are stored / edited independently.
+ */
+export function defaultTotalGradingScale(referenceMaximum = 700): TotalGradingScale {
+  const ref = Math.max(1, referenceMaximum)
+  const floor = (pct: number) => Number((ref * pct).toFixed(2))
+  return {
+    referenceMaximum: ref,
+    rules: [
+      { grade: 'EE', min: floor(0.75), max: ref, description: 'Exceeding Expectations', sort_order: 0 },
+      { grade: 'ME', min: floor(0.41), max: floor(0.75) - 0.01, description: 'Meeting Expectations', sort_order: 1 },
+      { grade: 'AE', min: floor(0.21), max: floor(0.41) - 0.01, description: 'Approaching Expectations', sort_order: 2 },
+      { grade: 'BE', min: 0, max: floor(0.21) - 0.01, description: 'Below Expectations', sort_order: 3 },
+    ],
+  }
+}
+
+/**
  * In-memory KNEC default level sets (4- and 8-level), mirroring the SQL
  * `knec_default_levels` function. Used to seed the grading settings UI and as
  * a runtime fallback when no configuration row exists yet.
@@ -332,18 +358,26 @@ export function remarkForLevel(overallLevel: string | null | undefined, scale: r
   return bank[Math.min(idx, bank.length - 1)]?.trim() ?? ''
 }
 
-/** The configured overall/totals grading scale, or null when not configured. */
+/**
+ * The configured overall/totals grading scale.
+ *
+ * When the school has not yet configured a totals scale, sensible raw-mark
+ * defaults are returned automatically (see `defaultTotalGradingScale`) so the
+ * Total Aggregate system always has its own distinct tiers — it never silently
+ * reuses the Learning Area percentage scale. The returned scale is fully
+ * editable via the grading settings page.
+ */
 export async function getTenantTotalGradingScale(tenantId: string): Promise<TotalGradingScale | null> {
   const supabase = await createClient()
   const { data: template } = await supabase.from('report_templates').select('id').eq('tenant_id', tenantId).eq('is_default', true).maybeSingle()
-  if (!template?.id) return null
+  if (!template?.id) return defaultTotalGradingScale()
   const { data, error } = await supabase
     .from('report_total_grading_levels')
     .select('level_code,min_score,max_score,description,sort_order,reference_maximum')
     .eq('tenant_id', tenantId)
     .eq('report_template_id', template.id)
     .order('sort_order')
-  if (error || !data?.length) return null
+  if (error || !data?.length) return defaultTotalGradingScale(Number(data?.[0]?.reference_maximum) || 700)
   return {
     referenceMaximum: Number(data[0].reference_maximum),
     rules: data.map(r => ({

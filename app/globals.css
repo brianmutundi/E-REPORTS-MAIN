@@ -382,6 +382,18 @@
   .signature-row {
     @apply mt-2 flex flex-wrap justify-between gap-x-8 gap-y-2 border-t border-slate-300 pt-2 text-sm font-medium text-slate-600;
   }
+  .signature-role {
+    @apply mt-3 border-t border-slate-300 pt-3;
+  }
+  .signature-line {
+    @apply flex flex-wrap justify-between gap-x-6 gap-y-1 text-sm font-medium text-slate-600;
+  }
+  .signature-remark {
+    @apply mt-1.5 flex gap-2 text-sm text-slate-700;
+  }
+  .signature-remark-label {
+    @apply font-semibold text-slate-600;
+  }
   .report-term-line {
     @apply mt-4 text-sm text-slate-700;
   }
@@ -395,6 +407,70 @@
   @media print {
     .no-print {
       display: none !important;
+    }
+    .report {
+      padding: 12px !important;
+      font-size: 11px !important;
+      border: none !important;
+      border-radius: 0 !important;
+      overflow: visible !important;
+      max-height: none !important;
+    }
+    .report-head {
+      margin-bottom: 6px !important;
+      padding-bottom: 6px !important;
+    }
+    .report-head h2 {
+      font-size: 14px !important;
+    }
+    .report-title {
+      font-size: 12px !important;
+    }
+    .student-meta {
+      margin-bottom: 6px !important;
+      padding-bottom: 4px !important;
+      gap: 4px !important;
+      font-size: 10px !important;
+    }
+    .report-table th,
+    .report-table td {
+      padding: 3px 5px !important;
+      font-size: 9px !important;
+    }
+    .report-table {
+      font-size: 9px !important;
+    }
+    .grading-key {
+      margin: 4px 0 !important;
+      font-size: 8px !important;
+    }
+    .financial-information {
+      margin-top: 6px !important;
+    }
+    .financial-information-title {
+      padding: 4px 6px !important;
+      font-size: 9px !important;
+    }
+    .financial-information-row {
+      min-height: 24px !important;
+      padding: 3px 6px !important;
+      font-size: 9px !important;
+    }
+    .report-term-line {
+      margin-top: 4px !important;
+      font-size: 10px !important;
+    }
+    .signature-block {
+      margin-top: 8px !important;
+    }
+    .signature-role {
+      margin-top: 4px !important;
+    }
+    .signature-line {
+      font-size: 10px !important;
+    }
+    .signature-remark {
+      font-size: 10px !important;
     }
   }
 }
