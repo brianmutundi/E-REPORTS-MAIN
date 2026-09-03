@@ -6,6 +6,7 @@ import { getDashboardSession } from '@/lib/supabase/session'
 import { getScopeStreams, getScopeExams, type ScopeExam } from '@/lib/scope'
 import PrintButton from '@/components/PrintButton'
 import CascadingFilterBar from '@/components/CascadingFilterBar'
+import ScrollToReport from '@/components/ScrollToReport'
 
 export default async function ReportsPage({ searchParams }: { searchParams: Promise<{ exam?: string; class?: string; student?: string; stream?: string }> }) {
   const params = await searchParams
@@ -115,6 +116,8 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
                     {results.length === 0 ? <div className="notice error">No students were found in the selected class.</div> : <div style={{ display: 'grid', gap: 10 }}>{results.map(student => <div key={student.studentId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '14px 16px', border: '1px solid #e2e8f0', borderRadius: 12, background: params.student === student.studentId ? '#f8fafc' : 'white', flexWrap: 'wrap' }}><div style={{ minWidth: 0, flex: '1 1 250px' }}><div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', fontFamily: 'monospace' }}>{student.admissionNo}</div><div style={{ fontWeight: 700, color: '#0f172a', marginTop: 3 }}>{student.fullName}</div></div><div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}><span style={{ display: 'inline-flex', alignItems: 'center', padding: '5px 9px', borderRadius: 999, fontSize: 12, fontWeight: 700, background: student.complete ? '#ecfdf5' : '#fff7ed', color: student.complete ? '#047857' : '#c2410c' }}>{student.complete ? 'Complete' : 'Incomplete'}</span><Link className="btn secondary" href={`/dashboard/reports?exam=${params.exam}&class=${params.class}${params.stream ? `&stream=${params.stream}` : ''}&student=${student.studentId}`}>View Report</Link></div></div>)}</div>}
       </section>
     )}
+
+    {hasSelection && !configured?.error && <ScrollToReport studentId={params.student ?? null} />}
 
     {selected && !configured?.error && (
       <section className="report card" style={{ marginTop: 20 }}>
