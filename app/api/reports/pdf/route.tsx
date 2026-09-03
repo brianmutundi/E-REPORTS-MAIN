@@ -93,7 +93,7 @@ function ReportPage({ tenant, examName, term, academicYear, className, template,
       {template.school.name ? <Text style={styles.school}>{tenant.name}</Text> : null}
       {template.school.contact && tenant.address ? <Text style={styles.address}>P.O Box: {tenant.address}</Text> : null}
       <Text style={styles.title}>Assessment Report</Text>
-      <Text>{template.examination.name ? examName : ''}{template.examination.term && term ? ` · ${term}` : ''}{template.examination.academicYear && academicYear ? ` · ${academicYear}` : ''}</Text>
+      <Text>{template.examination.name && (examName || '').replace(/\s+\d{4}\s*$/, '')}{template.examination.term && term ? ` · ${term}` : ''}{template.examination.academicYear && academicYear ? `, ${academicYear}` : ''}</Text>
     </View>
 
     <View style={styles.meta}>
@@ -155,15 +155,15 @@ function ReportPage({ tenant, examName, term, academicYear, className, template,
     {(openingDate || closingDate) && <View style={{ marginTop: 8 }}><Text style={{ fontSize: 9 }}>School Closes on <Text style={{ fontWeight: 700 }}>{closingDate ?? '_____________'}</Text> and opens on <Text style={{ fontWeight: 700 }}>{openingDate ?? '_____________'}</Text></Text></View>}
     {(template.additional.teacherComment) && (
       <View style={styles.roleRemark}>
-        <View style={styles.signatureRow}><Text>Grade Class Teacher: ({teacherName || 'Class Teacher&apos;s Name'})</Text><Text>Sign: _____________</Text><Text>Date: _____________</Text></View>
-        <Text style={{ marginTop: 6 }}>Remark (Class teacher&apos;s Remark):</Text>
+        <View style={styles.signatureRow}><Text>Grade Class Teacher: {teacherName || 'Class Teacher&apos;s Name'}</Text><Text>Sign: _____________</Text><Text>Date: _____________</Text></View>
+        <Text style={{ marginTop: 6 }}>Class Teacher&apos;s Remark:</Text>
         <Text style={{ marginTop: 3, lineHeight: 1.4, fontSize: 8 }}>{teacherRemark || '______________________________________________'}</Text>
       </View>
     )}
     {(template.additional.overallComment) && (
       <View style={styles.roleRemark}>
-        <View style={[styles.signatureRow, { marginTop: 10 }]}><Text>Principal: ({principalName || 'Principal&apos;s Name'})</Text><Text>Sign: _____________</Text><Text>Date: _____________</Text></View>
-        <Text style={{ marginTop: 6 }}>Remark (Principal&apos;s Remark):</Text>
+        <View style={[styles.signatureRow, { marginTop: 10 }]}><Text>Principal: {principalName || 'Principal&apos;s Name'}</Text><Text>Sign: _____________</Text><Text>Date: _____________</Text></View>
+        <Text style={{ marginTop: 6 }}>Principal&apos;s Remark:</Text>
         <Text style={{ marginTop: 3, lineHeight: 1.4, fontSize: 8 }}>{principalRemark || '______________________________________________'}</Text>
       </View>
     )}
