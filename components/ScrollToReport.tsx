@@ -1,44 +1,62 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect } from 'react'
 
 /**
  * When a student is selected on the Reports page, the generated report
- * document renders at the bottom of the page, below the (often long) student
- * list. Without auto-scrolling the page would appear unchanged after clicking
- * "View Report", hiding the report and its "Generate PDF" action. This
- * component scrolls the selected report into view whenever the selection
- * changes.
+ * document renders below the (often long) student list. Without auto-scrolling
+ * the page would appear unchanged after clicking "View Report", hiding the
+ * report and its "Generate PDF" action. This component scrolls the selected
+ * report into view, re-attempting whenever the selection changes and keeping
+ * the report in view even while it re-renders.
  */
 export default function ScrollToReport({ studentId }: { studentId: string | null }) {
-  const lastScrolled = useRef<string | null>(null)
-
   useEffect(() => {
     if (!studentId) return
-    if (lastScrolled.current === studentId) return
 
-    const observer = new MutationObserver(scroll)
-    const poll = setInterval(scroll, 400)
+    let cancelled = false
+    let settled = false
+    let tries = 0
+    let interval: ReturnType<typeof setInterval> | null = null
+    let observer: MutationObserver | null = null
 
-    function scroll() {
-      const report = document.querySelector<HTMLElement>('.report')
-      if (!report) return
-      if (lastScrolled.current !== studentId) {
-        lastScrolled.current = studentId
-        report.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      }
-      clearInterval(poll)
-      observer.disconnect()
+    const stop = () => {
+      if (cancelled) return
+      if (interval) clearInterval(interval)
+      if (observer) observer.disconnect()
     }
 
-    // React to the report entering the DOM (RSC can commit it well after this
-    // effect first runs on a client-side "View Report" click), polling as a
-    // fallback; whichever fires first scrolls the report into view exactly once.
+    const scrollOnce = () => {
+      if (cancelled || settled) return
+      const report = document.querySelector<HTMLElement>('.report')
+      if (!report) return
+      const rect = report.getBoundingClientRect()
+      const inView = rect.top >= -60 && rect.top < window.innerHeight - 80
+      if (inView) {
+        // Nudge to the very top once (report header + Generate PDF button).
+        if (rect.top > 160) report.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        settled = true
+        stop()
+        return
+      }
+      report.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+
+    // The report can enter the DOM/move well after this effect first runs on a
+    // client-side "View Report" click (RSC) and can keep re-rendering while a
+    // new student's report streams in. React to mutations and poll as a
+    // fallback, converging on the report being in the viewport before stopping.
+    observer = new MutationObserver(() => scrollOnce())
     observer.observe(document.body, { childList: true, subtree: true })
+    interval = setInterval(() => {
+      if (tries++ >= 40) stop()
+      else scrollOnce()
+    }, 300)
 
     return () => {
-      clearInterval(poll)
-      observer.disconnect()
+      cancelled = true
+      if (interval) clearInterval(interval)
+      if (observer) observer.disconnect()
     }
   }, [studentId])
 
