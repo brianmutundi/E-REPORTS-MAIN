@@ -228,17 +228,17 @@ export async function buildAssessmentAnalysis(params: AnalysisQueryParams): Prom
     : null
 
   // Performance-level distribution over assessed learners. Zero-count levels
-  // are retained so the scale stays complete.
-  const configuredLevels: { code: string; description: string }[] = scale
+  // are retained so the scale stays complete. Order and colours come from the
+  // active grading configuration (mode-aware), not a hard-coded list.
+  const configuredLevels: { code: string; description: string; color: string }[] = scale
     .filter((r) => isFiniteNum(r.min) || isFiniteNum(r.max))
-    .map((r) => ({ code: r.grade, description: r.description }))
-  const scaleSet = configuredLevels.length ? configuredLevels : [{ code: 'EE', description: 'Exceeding Expectation' }, { code: 'ME', description: 'Meeting Expectation' }, { code: 'AE', description: 'Approaching Expectation' }, { code: 'BE', description: 'Below Expectation' }]
-  // Preserve EE/ME/AE/BE order when present.
-  const orderedLevels = [...scaleSet].sort((a, b) => {
-    const order = ['EE', 'ME', 'AE', 'BE']
-    return order.indexOf(a.code) - order.indexOf(b.code) || a.code.localeCompare(b.code)
-  })
-  const performanceDistribution: AnalysisLevel[] = orderedLevels.map((lv) => {
+    .map((r) => ({ code: r.grade, description: r.description || r.name || r.grade, color: (r as any).color || levelColor(r.grade) }))
+  const scaleSet = configuredLevels.length
+    ? configuredLevels
+    : [{ code: 'EE', description: 'Exceeding Expectation', color: levelColor('EE') }, { code: 'ME', description: 'Meeting Expectation', color: levelColor('ME') }, { code: 'AE', description: 'Approaching Expectation', color: levelColor('AE') }, { code: 'BE', description: 'Below Expectation', color: levelColor('BE') }]
+  // The active configuration already returns levels in ascending sort order;
+  // keep that order so the distribution matches the configured level sequence.
+  const performanceDistribution: AnalysisLevel[] = scaleSet.map((lv) => {
     const lvl = lv.code
     const count = assessedLeaners.filter((l) => (l.overallLevel || '—') === lvl).length
     return {
@@ -246,7 +246,7 @@ export async function buildAssessmentAnalysis(params: AnalysisQueryParams): Prom
       description: lv.description,
       count,
       percentage: assessedCount ? (count / assessedCount) * 100 : null,
-      color: levelColor(lvl),
+      color: lv.color,
     }
   })
 

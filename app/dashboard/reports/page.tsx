@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { getConfiguredAssessmentResults } from '@/lib/results'
 import { getReportTenant, normalizeReportTemplate } from '@/lib/report-template'
-import { getTenantGradingScale } from '@/lib/grading'
+import { getTenantGradingScale, remarkForLevel } from '@/lib/grading'
 import { getDashboardSession } from '@/lib/supabase/session'
 import { getScopeStreams, getScopeExams, type ScopeExam } from '@/lib/scope'
 import PrintButton from '@/components/PrintButton'
@@ -32,15 +32,23 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const hasSelection = Boolean(params.exam && params.class && gradeValid)
   // Round 2 — the configured report detail (needs templateRow) and the heavy
   // computed results (needs template + class) are independent of each other.
-  const [{ data: reportConfig }, configured] = hasSelection
+  const [{ data: reportConfig }, configured, remarkBanks] = hasSelection
     ? await Promise.all([
         templateRow?.id
           ? supabase.from('report_template_configs').select('opening_date,closing_date').eq('report_template_id', templateRow.id).maybeSingle()
           : Promise.resolve({ data: null }),
         getConfiguredAssessmentResults(params.exam!, params.class!, template.assessmentComponents, params.stream),
+        templateRow?.id
+          ? Promise.all([
+              supabase.from('report_teacher_remarks').select('remark,sort_order').eq('report_template_id', templateRow.id).order('sort_order'),
+              supabase.from('report_principal_remarks').select('remark,sort_order').eq('report_template_id', templateRow.id).order('sort_order'),
+            ]).then(([teacher, principal]) => ({ teacher: teacher.data?.map(r => r.remark) ?? [], principal: principal.data?.map(r => r.remark) ?? [] }))
+          : Promise.resolve({ teacher: [], principal: [] }),
       ])
-    : [{ data: null }, null]
+    : [{ data: null }, null, { teacher: [], principal: [] }]
   const results = configured?.rows ?? []
+  const teacherRemarks = remarkBanks?.teacher ?? []
+  const principalRemarks = remarkBanks?.principal ?? []
   const selected = params.student ? results.find(r => r.studentId === params.student) : undefined
   const exam = exams?.find(e => e.id === params.exam)
   const className = classes?.find(c => c.id === params.class)?.name
@@ -211,13 +219,13 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
         {template.additional.teacherComment && (
           <div className="preview-note report-remark">
             <b>Remark (Class teacher)</b>
-            <p className="remark-text">{selected.overallDescription || '____________________________'}</p>
+            <p className="remark-text">{remarkForLevel(selected.overallLevel, gradingScale, teacherRemarks) || '____________________________'}</p>
           </div>
         )}
         {template.additional.overallComment && (
           <div className="preview-note report-remark">
             <b>Remark (Principal)</b>
-            <p className="remark-text">{selected.overallDescription || '____________________________'}</p>
+            <p className="remark-text">{remarkForLevel(selected.overallLevel, gradingScale, principalRemarks) || '____________________________'}</p>
           </div>
         )}
         {template.additional.signatureArea && (
