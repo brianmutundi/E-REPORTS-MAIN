@@ -43,6 +43,12 @@ const styles = StyleSheet.create({
   signatureBlock: { borderTop: '1 solid #777', paddingTop: 6 },
   signatureRole: { marginTop: 10 },
   signatureLine: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 8, fontSize: 8 },
+  gradingKey: { marginTop: 10, border: '1 solid #1e293b', width: '100%' },
+  gradingKeyHeader: { backgroundColor: '#e6e6e6', textAlign: 'center', fontWeight: 700, paddingVertical: 3, borderBottom: '1 solid #1e293b', fontSize: 10 },
+  gradingKeyRow: { flexDirection: 'row' },
+  gradingKeyHead: { backgroundColor: '#f9f9f9', borderBottom: '1 solid #1e293b' },
+  gradingKeyCell: { flex: 1, textAlign: 'center', paddingVertical: 3, paddingHorizontal: 2, borderRight: '1 solid #1e293b' },
+  gradingKeyDesc: { fontSize: 7, fontWeight: 700 },
 })
 
 type PdfProps = {
@@ -59,7 +65,7 @@ type PdfProps = {
   principalName?: string | null
 }
 
-function ReportPage({ tenant, reportType, className, reportLabel, term, academicYear, result, remarkBanks, teacherName, principalName }: PdfProps) {
+function ReportPage({ tenant, reportType, className, reportLabel, term, academicYear, result, gradingScale = [], remarkBanks, teacherName, principalName }: PdfProps) {
   const isSnapshot = reportTypeIsSnapshot(reportType)
   const isAggregate = reportType === 'termly_average' || reportType === 'yearly_average'
   const teacherRemark = remarkBandForPercent(result.overallPercent, remarkBanks, 'class_teacher')
@@ -113,6 +119,25 @@ function ReportPage({ tenant, reportType, className, reportLabel, term, academic
       <View style={styles.summaryItem}><Text style={styles.summaryKey}>Overall Position</Text><Text style={{ fontWeight: 700 }}>{result.complete ? result.position : '—'}</Text></View>
       {result.overallPercent !== null && <View style={styles.summaryItem}><Text style={styles.summaryKey}>Overall</Text><Text style={{ fontWeight: 700, color: ACCENT }}>{result.overallLevel}{result.overallDescription ? ` · ${result.overallDescription}` : ''}</Text></View>}
     </View>
+
+    {gradingScale.length > 0 && (
+      <View style={styles.gradingKey} wrap={false}>
+        <Text style={styles.gradingKeyHeader}>PERFORMANCE LEVEL KEY ({gradingScale.length}-LEVEL SCALE)</Text>
+        <View style={[styles.gradingKeyRow, styles.gradingKeyHead]}>
+          {gradingScale.map((r, i) => <Text key={i} style={[styles.gradingKeyCell, { fontWeight: 700 }]}>{r.grade}</Text>)}
+        </View>
+        <View style={styles.gradingKeyRow}>
+          {gradingScale.map((r, i) => <Text key={i} style={[styles.gradingKeyCell, styles.gradingKeyDesc]}>{r.description.toUpperCase()}</Text>)}
+        </View>
+        <View style={styles.gradingKeyRow}>
+          {gradingScale.map((r, i) => {
+            const min = Math.ceil(r.min)
+            const max = Math.floor(r.max)
+            return <Text key={i} style={styles.gradingKeyCell}>{min === max ? `${min}` : `${min} - ${max}`}</Text>
+          })}
+        </View>
+      </View>
+    )}
 
     <View style={styles.remarks}>
       <View style={styles.remark}><Text style={styles.remarkLabel}>Class Teacher&apos;s Remark</Text><Text style={styles.remarkText}>{teacherRemark || '—'}</Text></View>

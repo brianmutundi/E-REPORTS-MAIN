@@ -442,6 +442,39 @@
     @apply text-emerald-700;
     color: var(--accent, #1e6fd9);
   }
+  .grading-key-table {
+    @apply mt-4 text-center;
+    border: 1px solid #1e293b;
+    border-radius: 6px;
+    overflow: hidden;
+    font-size: 11px;
+  }
+  .grading-key-header {
+    @apply py-1 text-center font-bold;
+    background: #e6e6e6;
+    border-bottom: 1px solid #1e293b;
+    font-size: 11px;
+  }
+  .grading-key-rows {
+    font-size: 10px;
+  }
+  .grading-key-row {
+    @apply flex flex-row;
+    border-bottom: 1px solid #1e293b;
+  }
+  .grading-key-row:last-child {
+    border-bottom: none;
+  }
+  .grading-key-cell {
+    @apply flex-1 px-1 py-1 text-center;
+    border-right: 1px solid #1e293b;
+  }
+  .grading-key-cell:last-child {
+    border-right: none;
+  }
+  .grading-key-cell.bold {
+    @apply font-bold;
+  }
   .remarks-block {
     @apply mt-4 space-y-3 border-t border-slate-100 pt-3;
   }

@@ -236,6 +236,27 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
           )}
         </div>
 
+        {gradingScale.length > 0 && (
+          <div className="grading-key-table" style={{ marginTop: 12 }}>
+            <div className="grading-key-header">PERFORMANCE LEVEL KEY ({gradingScale.length}-LEVEL SCALE)</div>
+            <div className="grading-key-rows">
+              <div className="grading-key-row">
+                {gradingScale.map((r, i) => <div key={i} className="grading-key-cell bold">{r.grade}</div>)}
+              </div>
+              <div className="grading-key-row">
+                {gradingScale.map((r, i) => <div key={i} className="grading-key-cell">{r.description.toUpperCase()}</div>)}
+              </div>
+              <div className="grading-key-row">
+                {gradingScale.map((r, i) => {
+                  const min = Math.ceil(r.min)
+                  const max = Math.floor(r.max)
+                  return <div key={i} className="grading-key-cell">{min === max ? `${min}` : `${min} – ${max}`}</div>
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="remarks-block">
           <div className="remark"><span className="remark-label">Class Teacher&apos;s Remark</span><p>{remarkBandForPercent(selected.overallPercent, remarkBanks, 'class_teacher')}</p></div>
           <div className="remark"><span className="remark-label">Head Teacher&apos;s Remark</span><p>{remarkBandForPercent(selected.overallPercent, remarkBanks, 'principal')}</p></div>
