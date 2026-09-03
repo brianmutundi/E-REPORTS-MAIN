@@ -41,8 +41,8 @@ const styles = StyleSheet.create({
   gradingKeyHeader: { backgroundColor: '#e6e6e6', textAlign: 'center', fontWeight: 700, paddingVertical: 3, borderBottom: '1 solid #333', fontSize: 11 },
   gradingKeyRow: { flexDirection: 'row' },
   gradingKeyHead: { backgroundColor: '#f9f9f9', borderBottom: '1 solid #333' },
-  gradingKeyCell: { flex: 1, textAlign: 'center', paddingVertical: 4, paddingHorizontal: 2, borderRight: '1 solid #333' },
-  gradingKeyDesc: { fontSize: 8, fontWeight: 700 },
+  gradingKeyCell: { flex: 1, width: '12.5%', textAlign: 'center', paddingVertical: 4, paddingHorizontal: 2, borderRight: '1 solid #333', wordBreak: 'keep-all', lineHeight: 1.3 },
+  gradingKeyDesc: { fontSize: 6.5, fontWeight: 700 },
 })
 
 type PdfProps = {
@@ -61,6 +61,26 @@ type PdfProps = {
   gradingScale?: { grade: string; min: number; max: number; description: string; sort_order?: number }[]
   teacherName?: string | null
   principalName?: string | null
+}
+
+// React-PDF's text layout engine breaks long words mid-word (with a hyphen)
+// when a word exceeds the cell width, and does not honor CSS hyphens/word-break.
+// To keep the PERFORMANCE LEVEL KEY header labels on whole-word boundaries, pre-wrap
+// each phrase into lines that fit the narrow 8-column cells using explicit newlines.
+function wrapDescription(phrase: string, maxChars = 14): string {
+  const words = phrase.toUpperCase().split(/\s+/).filter(Boolean)
+  const lines: string[] = []
+  let cur = ''
+  for (const w of words) {
+    const next = cur ? `${cur} ${w}` : w
+    if (next.length <= maxChars) cur = next
+    else {
+      if (cur) lines.push(cur)
+      cur = w
+    }
+  }
+  if (cur) lines.push(cur)
+  return lines.join('\n')
 }
 
 function ReportPage({ tenant, examName, term, academicYear, className, template, result, openingDate, closingDate, remarkBanks, gradingScale = [], teacherName, principalName }: PdfProps) {
@@ -107,7 +127,7 @@ function ReportPage({ tenant, examName, term, academicYear, className, template,
           {gradingScale.map(r => <Text key={r.grade} style={[styles.gradingKeyCell, { fontWeight: 700 }]}>{r.grade}</Text>)}
         </View>
         <View style={styles.tr}>
-          {gradingScale.map(r => <Text key={r.grade} style={[styles.gradingKeyCell, styles.gradingKeyDesc]}>{r.description.toUpperCase()}</Text>)}
+          {gradingScale.map(r => <Text key={r.grade} style={[styles.gradingKeyCell, styles.gradingKeyDesc]}>{wrapDescription(r.description)}</Text>)}
         </View>
         <View style={styles.tr}>
           {gradingScale.map(r => {

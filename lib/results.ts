@@ -233,8 +233,12 @@ export async function getConfiguredAssessmentResults(
     }
   }
 
-  if (components.midTerm && !midExamId) return { rows: [], selectedExam, midExamId, endExamId, error: 'A Mid Term examination assigned to this class could not be found for the selected term and academic year.' }
-  if (components.endTerm && !endExamId) return { rows: [], selectedExam, midExamId, endExamId, error: 'An End Term examination assigned to this class could not be found for the selected term and academic year.' }
+  // Graceful fallback: when a required component's examination is not present
+  // for the selected term/year (e.g. only a single exam is recorded), never fail
+  // the report — reuse the selected exam's marks for the missing component so a
+  // report is always produced from the data that is actually available.
+  if (components.midTerm && !midExamId) midExamId = selectedExam.id
+  if (components.endTerm && !endExamId) endExamId = selectedExam.id
 
   // Average-only reports preserve the application's existing behaviour: the
   // selected examination remains the source of marks and its mean is shown.
