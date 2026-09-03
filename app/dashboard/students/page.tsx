@@ -6,6 +6,7 @@ import SuccessToast from '@/components/SuccessToast'
 import { toTitleCase } from '@/lib/format-name'
 import { getDashboardSession } from '@/lib/supabase/session'
 import ClassSwitcher from '@/components/ClassSwitcher'
+import { friendlyDbMessage } from '@/lib/db-errors'
 
 async function getTenantContext() {
   const { supabase, user, tenantId } = await getDashboardSession()
@@ -42,7 +43,10 @@ async function getClassCounts(supabase: Awaited<ReturnType<typeof getDashboardSe
 
 function getStudentWriteErrorMessage(error: { code?: string; message?: string } | null | undefined): string {
   if (!error) return 'The student could not be saved.'
-  if (error.code === '23505') return 'That admission number is already used in this school.'
+  // Centralized mapping: handles 23505 (duplicate admission), 23503 (FK), etc.
+  // without exposing raw Postgres details.
+  const msg = friendlyDbMessage(error)
+  if (msg !== 'An unexpected error occurred. Please try again.') return msg
   if (error.code === '23503') return 'The selected class is no longer available.'
   return 'The student could not be saved. Please try again.'
 }
@@ -128,7 +132,7 @@ async function saveStudent(formData: FormData) {
   if (duplicateStudent) {
     redirect(
       `/dashboard/students?class_id=${encodeURIComponent(safeClassId)}&error=${encodeURIComponent(
-        'That admission number is already used in this school.',
+        'Learner already exists|A learner with this admission number is already registered in this school.',
       )}`,
     )
   }
@@ -300,7 +304,7 @@ export default async function StudentsPage({
 
       </div>
 
-      {params.error && <div className="notice error">{params.error}</div>}
+      {params.error && (() => { const idx = params.error.indexOf('|'); return idx > -1 ? <div className="notice error"><span className="font-semibold">{params.error.slice(0, idx)}</span><span className="block text-xs opacity-80 mt-0.5">{params.error.slice(idx + 1)}</span></div> : <div className="notice error">{params.error}</div> })()}
       {params.saved && <SuccessToast message="Student saved" />}
       {params.deleted && <div className="notice success">Student deleted.</div>}
 

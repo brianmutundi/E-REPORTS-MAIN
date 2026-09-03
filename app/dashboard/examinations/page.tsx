@@ -5,6 +5,7 @@ import { getDashboardSession } from '@/lib/supabase/session'
 import SuccessToast from '@/components/SuccessToast'
 import EmptyState from '@/components/EmptyState'
 import { ClipboardList } from 'lucide-react'
+import { friendlyDbRedirect } from '@/lib/db-errors'
 
 const ASSESSMENT_COMPONENTS = ['test_exam', 'mid_term', 'end_term'] as const
 
@@ -63,9 +64,9 @@ const { error } = await supabase
       assessment_component,
     })
 
-  if (error) {
+if (error) {
     redirect(
-      `/dashboard/examinations?error=${encodeURIComponent(error.message)}`
+      `/dashboard/examinations?error=${encodeURIComponent(friendlyDbRedirect(error))}`
     )
   }
 
@@ -160,9 +161,7 @@ const params = await searchParams
         </Link>
       </div>
 
-      {params.error && (
-        <div className="notice error">{params.error}</div>
-      )}
+      {(() => { const idx = params.error?.indexOf('|') ?? -1; return params.error && (idx > -1 ? <div className="notice error"><span className="font-semibold">{params.error.slice(0, idx)}</span><span className="block text-xs opacity-80 mt-0.5">{params.error.slice(idx + 1)}</span></div> : <div className="notice error">{params.error}</div>) })()}
 
       {params.saved && (
         <SuccessToast message="Examination created" />

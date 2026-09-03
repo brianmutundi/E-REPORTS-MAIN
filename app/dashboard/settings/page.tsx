@@ -4,13 +4,14 @@ import { getDashboardSession } from '@/lib/supabase/session'
 import SuccessToast from '@/components/SuccessToast'
 import SchoolLogoUploader from './logo-uploader'
 import ChangePasswordForm from './change-password-form'
+import { friendlyDbRedirect } from '@/lib/db-errors'
 
 async function saveSchool(formData: FormData) {
   'use server'
   const { supabase, user, tenantId } = await getDashboardSession(); if (!user) redirect('/login')
-  if (!tenantId) redirect('/dashboard/settings?error=No%20school%20is%20linked')
+  if (!tenantId) redirect('/dashboard/settings?error=' + encodeURIComponent('Error|No school is linked to this account.'))
   const name = String(formData.get('name') || '').trim(); const code = String(formData.get('code') || '').trim() || null; const address = String(formData.get('address') || '').trim() || null
-  if (!name) redirect('/dashboard/settings?error=School%20name%20is%20required')
+  if (!name) redirect('/dashboard/settings?error=' + encodeURIComponent('Error|School name is required.'))
   // Try to persist the address too; if the column has not been applied to
   // the project yet, fall back to the original fields so saving still works.
   let { error } = await supabase.from('tenants').update({ name, code, address }).eq('id', tenantId)
@@ -18,7 +19,7 @@ async function saveSchool(formData: FormData) {
     const retry = await supabase.from('tenants').update({ name, code }).eq('id', tenantId)
     error = retry.error
   }
-  if (error) redirect(`/dashboard/settings?error=${encodeURIComponent(error.message)}`)
+  if (error) redirect('/dashboard/settings?error=' + encodeURIComponent(friendlyDbRedirect(error)))
   redirect('/dashboard/settings?saved=1')
 }
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<{saved?:string;error?:string}> }) {
@@ -27,7 +28,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   const {data:tenant}=await supabase.from('tenants').select('name,code,logo_url').eq('id', tenantId).single()
   let address=''
   const addr=await supabase.from('tenants').select('address').eq('id', tenantId).maybeSingle(); if(!addr.error)address=addr.data?.address??''
-  return <main className="main" style={{maxWidth:850,margin:'0 auto'}}><div className="top"><div><div className="eyebrow">School setup</div><h1 className="title">School Profile</h1><p className="muted">These details are used on report forms.</p></div><Link className="btn secondary" href="/dashboard/reports/template">Report Template</Link></div>{params.error&&<div className="notice error">{params.error}</div>}{params.saved&&<SuccessToast message="School profile saved" />}
+  return <main className="main" style={{maxWidth:850,margin:'0 auto'}}><div className="top"><div><div className="eyebrow">School setup</div><h1 className="title">School Profile</h1><p className="muted">These details are used on report forms.</p></div><Link className="btn secondary" href="/dashboard/reports/template">Report Template</Link></div>{params.error&&(() => { const i=params.error.indexOf('|'); return i>-1 ? <div className="notice error"><span className="font-semibold">{params.error.slice(0,i)}</span><span className="block text-xs opacity-80 mt-0.5">{params.error.slice(i+1)}</span></div> : <div className="notice error">{params.error}</div> })()}{params.saved&&<SuccessToast message="School profile saved" />}
     <div className="card" style={{display:'grid',gap:15}}>
       <h2 className="section-heading" style={{margin:0,fontSize:18}}>School details</h2>
       <SchoolLogoUploader logoUrl={tenant?.logo_url ?? null} tenantId={tenantId} />

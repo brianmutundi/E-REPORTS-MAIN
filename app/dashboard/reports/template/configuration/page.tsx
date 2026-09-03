@@ -5,6 +5,7 @@ import { getDashboardSession } from '@/lib/supabase/session'
 import { normalizeAssessmentComponents, normalizeReportTemplate } from '@/lib/report-template'
 import AssessmentComponentsEditor from './AssessmentComponentsEditor'
 import SuccessToast from '@/components/SuccessToast'
+import { friendlyDbRedirect } from '@/lib/db-errors'
 
 const DEFAULT_TEACHER_REMARKS = ['Excellent progress', 'Very good progress', 'Good progress', 'Needs improvement']
 const DEFAULT_PRINCIPAL_REMARKS = ['Promoted to the next level', 'Keep up the good work', 'Continue working hard', 'Needs closer support']
@@ -17,12 +18,12 @@ async function saveConfiguration(formData: FormData) {
   'use server'
   const { supabase, user, tenantId } = await getDashboardSession()
   if (!user) redirect('/login')
-  if (!tenantId) redirect('/dashboard/reports/template/configuration?error=No%20school%20is%20linked%20to%20this%20account')
+  if (!tenantId) redirect('/dashboard/reports/template/configuration?error=' + encodeURIComponent('Error|No school is linked to this account.'))
 
   const teacherRemarks = rowsFromForm(formData, 'teacher')
   const principalRemarks = rowsFromForm(formData, 'principal')
-  if (teacherRemarks.length < 4 || teacherRemarks.length > 8) redirect('/dashboard/reports/template/configuration?error=Class%20teacher%20remarks%20must%20contain%204%20to%208%20rows')
-  if (principalRemarks.length < 4 || principalRemarks.length > 8) redirect('/dashboard/reports/template/configuration?error=Principal%20remarks%20must%20contain%204%20to%208%20rows')
+  if (teacherRemarks.length < 4 || teacherRemarks.length > 8) redirect('/dashboard/reports/template/configuration?error=' + encodeURIComponent('Error|Class teacher remarks must contain 4 to 8 rows.'))
+  if (principalRemarks.length < 4 || principalRemarks.length > 8) redirect('/dashboard/reports/template/configuration?error=' + encodeURIComponent('Error|Principal remarks must contain 4 to 8 rows.'))
 
   const assessmentComponents = {
     midTerm: formData.get('assessment_mid_term') === 'on',
@@ -30,7 +31,7 @@ async function saveConfiguration(formData: FormData) {
     average: formData.get('assessment_average') === 'on',
   }
   if (!assessmentComponents.midTerm && !assessmentComponents.endTerm && !assessmentComponents.average) {
-    redirect('/dashboard/reports/template/configuration?error=Select%20at%20least%20one%20assessment%20component')
+    redirect('/dashboard/reports/template/configuration?error=' + encodeURIComponent('Error|Select at least one assessment component.'))
   }
 
   // Atomic save: template, config and both remark lists change in a single
@@ -48,33 +49,33 @@ async function saveConfiguration(formData: FormData) {
 
   if (configureError) {
     if (configureError.code !== 'PGRST202' && !/cannot find the function|does not exist/i.test(configureError.message ?? '')) {
-      redirect(`/dashboard/reports/template/configuration?error=${encodeURIComponent(configureError.message || 'Could not save configuration')}`)
+      redirect(`/dashboard/reports/template/configuration?error=${encodeURIComponent(friendlyDbRedirect(configureError) || 'Could not save configuration.')}`)
     }
     const { data: template } = await supabase.from('report_templates').select('id,template_json').eq('tenant_id', tenantId).eq('is_default', true).maybeSingle()
     let templateId = template?.id
     if (!templateId) {
       const { data: created, error } = await supabase.from('report_templates').insert({ tenant_id: tenantId, name: 'Default Report Form', template_json: { assessmentComponents }, is_default: true }).select('id').single()
-      if (error || !created) redirect(`/dashboard/reports/template/configuration?error=${encodeURIComponent(error?.message || 'Could not create report template')}`)
+      if (error || !created) redirect(`/dashboard/reports/template/configuration?error=${encodeURIComponent(friendlyDbRedirect(error) || 'Could not create report template.')}`)
       templateId = created.id
     } else {
       const existingTemplate = normalizeReportTemplate(template?.template_json)
       const nextTemplate = { ...existingTemplate, assessmentComponents }
       const { error: templateError } = await supabase.from('report_templates').update({ template_json: nextTemplate }).eq('id', templateId).eq('tenant_id', tenantId)
-      if (templateError) redirect(`/dashboard/reports/template/configuration?error=${encodeURIComponent(templateError.message)}`)
+      if (templateError) redirect(`/dashboard/reports/template/configuration?error=${encodeURIComponent(friendlyDbRedirect(templateError) || 'Could not save configuration.')}`)
     }
 
     const configPayload = { tenant_id: tenantId, report_template_id: templateId, opening_date: String(formData.get('opening_date') || '') || null, closing_date: String(formData.get('closing_date') || '') || null, teacher_remarks_enabled: formData.get('teacher_enabled') === 'on', principal_remarks_enabled: formData.get('principal_enabled') === 'on' }
     const { error: configError } = await supabase.from('report_template_configs').upsert(configPayload, { onConflict: 'report_template_id' })
-    if (configError) redirect(`/dashboard/reports/template/configuration?error=${encodeURIComponent(configError.message)}`)
+    if (configError) redirect(`/dashboard/reports/template/configuration?error=${encodeURIComponent(friendlyDbRedirect(configError) || 'Could not save configuration.')}`)
 
     const { error: teacherDeleteError } = await supabase.from('report_teacher_remarks').delete().eq('report_template_id', templateId)
-    if (teacherDeleteError) redirect(`/dashboard/reports/template/configuration?error=${encodeURIComponent(teacherDeleteError.message)}`)
+    if (teacherDeleteError) redirect(`/dashboard/reports/template/configuration?error=${encodeURIComponent(friendlyDbRedirect(teacherDeleteError) || 'Could not save configuration.')}`)
     const { error: principalDeleteError } = await supabase.from('report_principal_remarks').delete().eq('report_template_id', templateId)
-    if (principalDeleteError) redirect(`/dashboard/reports/template/configuration?error=${encodeURIComponent(principalDeleteError.message)}`)
+    if (principalDeleteError) redirect(`/dashboard/reports/template/configuration?error=${encodeURIComponent(friendlyDbRedirect(principalDeleteError) || 'Could not save configuration.')}`)
     const { error: teacherError } = await supabase.from('report_teacher_remarks').insert(teacherRemarks.map((remark, i) => ({ tenant_id: tenantId, report_template_id: templateId, remark, sort_order: i })))
-    if (teacherError) redirect(`/dashboard/reports/template/configuration?error=${encodeURIComponent(teacherError.message)}`)
+    if (teacherError) redirect(`/dashboard/reports/template/configuration?error=${encodeURIComponent(friendlyDbRedirect(teacherError) || 'Could not save configuration.')}`)
     const { error: principalError } = await supabase.from('report_principal_remarks').insert(principalRemarks.map((remark, i) => ({ tenant_id: tenantId, report_template_id: templateId, remark, sort_order: i })))
-    if (principalError) redirect(`/dashboard/reports/template/configuration?error=${encodeURIComponent(principalError.message)}`)
+    if (principalError) redirect(`/dashboard/reports/template/configuration?error=${encodeURIComponent(friendlyDbRedirect(principalError) || 'Could not save configuration.')}`)
   }
 
   revalidatePath('/dashboard/reports')

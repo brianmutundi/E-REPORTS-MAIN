@@ -3,21 +3,28 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { getDashboardSession } from '@/lib/supabase/session'
 import SuccessToast from '@/components/SuccessToast'
+import { friendlyDbRedirect } from '@/lib/db-errors'
+
+const STREAM_ERR = {
+  noSchool:    encodeURIComponent('Error|No school is linked to this account.'),
+  missingArgs: encodeURIComponent('Error|Grade and stream name are required.'),
+  invalidGrade:encodeURIComponent('Error|Invalid grade.'),
+}
 
 async function saveStream(formData: FormData) {
   'use server'
   const { supabase, user, tenantId } = await getDashboardSession(); if (!user) redirect('/login')
-  if (!tenantId) redirect('/dashboard/streams?error=No%20school%20is%20linked')
+  if (!tenantId) redirect('/dashboard/streams?error=' + STREAM_ERR.noSchool)
   const p = { tenant_id: tenantId }
   const classId = String(formData.get('class_id') || ''); const name = String(formData.get('name') || '').trim()
-  if (!classId || !name) redirect('/dashboard/streams?error=Grade%20and%20stream%20name%20are%20required')
+  if (!classId || !name) redirect('/dashboard/streams?error=' + STREAM_ERR.missingArgs)
   const { data: cls } = await supabase.from('classes').select('id').eq('id', classId).eq('tenant_id', p.tenant_id).maybeSingle()
-  if (!cls) redirect('/dashboard/streams?error=Invalid%20grade')
+  if (!cls) redirect('/dashboard/streams?error=' + STREAM_ERR.invalidGrade)
+  // Pre-check duplicate: (class_id, name) unique constraint
+  const { data: existing } = await supabase.from('streams').select('id').eq('class_id', classId).ilike('name', name).maybeSingle()
+  if (existing) redirect('/dashboard/streams?error=' + encodeURIComponent('Stream already exists|A stream with this name already exists in this grade. Please use a different name.'))
   const { error } = await supabase.from('streams').insert({ tenant_id: p.tenant_id, class_id: classId, name })
-  if (error) {
-    const message = error.code === '23505' ? 'A stream with that name already exists in this grade.' : 'The stream could not be saved.'
-    redirect(`/dashboard/streams?error=${encodeURIComponent(message)}`)
-  }
+  if (error) redirect('/dashboard/streams?error=' + encodeURIComponent(friendlyDbRedirect(error)))
   revalidatePath('/dashboard/streams'); revalidatePath('/dashboard/students'); redirect('/dashboard/streams?saved=1')
 }
 
@@ -68,7 +75,7 @@ export default async function StreamsPage({ searchParams }: { searchParams: Prom
   for (const s of streams ?? []) { const list = streamsByClass.get(s.class_id) ?? []; list.push(s); streamsByClass.set(s.class_id, list) }
   const hasStreams = (streams ?? []).length > 0
   return <main className="main" style={{ maxWidth: 1050, margin: '0 auto' }}><div className="top"><div><div className="eyebrow">Academic organisation</div><h1 className="title">Streams</h1><p className="muted">Groups within a grade. Learners assigned to a stream get a stream position and stream analysis.</p></div><Link className="btn secondary" href="/dashboard/students">Learners</Link></div>
-    {params.error && <div className="notice error">{params.error}</div>}{params.saved && <SuccessToast message="Stream saved" />}{params.deleted && <SuccessToast message="Stream deleted" />}
+    {params.error && (() => { const idx = params.error.indexOf('|'); return idx > -1 ? <div className="notice error"><span className="font-semibold">{params.error.slice(0, idx)}</span><span className="block text-xs opacity-80 mt-0.5">{params.error.slice(idx + 1)}</span></div> : <div className="notice error">{params.error}</div> })()}{params.saved && <SuccessToast message="Stream saved" />}{params.deleted && <SuccessToast message="Stream deleted" />}
     <section className="card"><h2>Add stream</h2><form action={saveStream} className="inline-form">
       <label className="field-label">Grade<select name="class_id" required defaultValue=""><option value="">Select grade</option>{(classes ?? []).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
       <label className="field-label">Stream name<input name="name" placeholder="e.g. East" required /></label>

@@ -4,12 +4,13 @@ import { redirect } from 'next/navigation'
 import { getDashboardSession } from '@/lib/supabase/session'
 import { defaultReportTemplate, normalizeReportTemplate, templateFields } from '@/lib/report-template'
 import SuccessToast from '@/components/SuccessToast'
+import { friendlyDbRedirect } from '@/lib/db-errors'
 
 async function saveTemplate(formData: FormData) {
   'use server'
   const { supabase, user, tenantId } = await getDashboardSession()
   if (!user) redirect('/login')
-  if (!tenantId) redirect('/dashboard/reports/template?error=No%20school%20is%20linked%20to%20this%20account')
+  if (!tenantId) redirect('/dashboard/reports/template?error=' + encodeURIComponent('Error|No school is linked to this account.'))
   const { data: existingRow } = await supabase.from('report_templates').select('id,template_json').eq('tenant_id', tenantId).eq('is_default', true).maybeSingle()
   const template = existingRow?.template_json ? normalizeReportTemplate(existingRow.template_json) : structuredClone(defaultReportTemplate)
   for (const field of templateFields) {
@@ -19,7 +20,7 @@ async function saveTemplate(formData: FormData) {
   const existing = existingRow
   const payload = { tenant_id: tenantId, name, template_json: template, is_default: true }
   const result = existing?.id ? await supabase.from('report_templates').update(payload).eq('id', existing.id) : await supabase.from('report_templates').insert(payload)
-  if (result.error) redirect(`/dashboard/reports/template?error=${encodeURIComponent(result.error.message)}`)
+  if (result.error) redirect('/dashboard/reports/template?error=' + encodeURIComponent(friendlyDbRedirect(result.error)))
   revalidatePath('/dashboard/reports'); revalidatePath('/dashboard/reports/template')
   redirect('/dashboard/reports/template?saved=1')
 }
@@ -33,7 +34,7 @@ export default async function ReportTemplatePage({ searchParams }: { searchParam
   const template = normalizeReportTemplate(row?.template_json)
   return <main className="main" style={{ maxWidth: 1180, margin: '0 auto' }}>
     <div className="top"><div><div className="eyebrow">Report configuration</div><h1 className="title">Report Template</h1><p className="muted">Choose exactly what appears on generated student reports.</p></div><div style={{ display: 'flex', gap: 8 }}><Link className="btn secondary" href="/dashboard/reports/template/configuration">Report settings</Link><Link className="btn secondary" href="/dashboard/reports">Back to reports</Link></div></div>
-    {params.error && <div className="notice error">{params.error}</div>}
+    {params.error && (() => { const idx = params.error.indexOf('|'); return idx > -1 ? <div className="notice error"><span className="font-semibold">{params.error.slice(0, idx)}</span><span className="block text-xs opacity-80 mt-0.5">{params.error.slice(idx + 1)}</span></div> : <div className="notice error">{params.error}</div> })()}
     {params.saved && <SuccessToast message="Template saved successfully" />}
     <form action={saveTemplate} className="template-layout">
       <section className="card"><div className="section-heading"><div><h2>Visible fields</h2><p className="muted">Turn sections on or off. Position is optional.</p></div></div>

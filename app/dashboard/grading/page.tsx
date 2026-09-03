@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { getDashboardSession } from '@/lib/supabase/session'
 import SuccessToast from '@/components/SuccessToast'
+import { friendlyDbRedirect } from '@/lib/db-errors'
 
 const DEFAULT_LEVELS = [
   { level_code: 'EE', min_score: 80, max_score: 100, description: 'Exceeding Expectation' },
@@ -95,12 +96,12 @@ async function saveGrading(formData: FormData) {
   })
   if (levelError) {
     if (levelError.code !== 'PGRST202' && !/cannot find the function|does not exist/i.test(levelError.message ?? '')) {
-      redirect(`/dashboard/grading?error=${encodeURIComponent(levelError.message || 'Could not save grading levels')}&tab=areas`)
+      redirect(`/dashboard/grading?error=${encodeURIComponent(friendlyDbRedirect(levelError) || 'Could not save grading levels')}&tab=areas`)
     }
     const { error: deleteError } = await supabase.from('report_grading_levels').delete().eq('report_template_id', templateId)
-    if (deleteError) redirect(`/dashboard/grading?error=${encodeURIComponent(deleteError.message)}&tab=areas`)
+    if (deleteError) redirect(`/dashboard/grading?error=${encodeURIComponent(friendlyDbRedirect(deleteError) || 'Could not save grading levels')}&tab=areas`)
     const { error } = await supabase.from('report_grading_levels').insert(rows.map(r => ({ ...r, tenant_id: tenantId, report_template_id: templateId })))
-    if (error) redirect(`/dashboard/grading?error=${encodeURIComponent(error.message)}&tab=areas`)
+    if (error) redirect(`/dashboard/grading?error=${encodeURIComponent(friendlyDbRedirect(error) || 'Could not save grading levels')}&tab=areas`)
   }
   revalidatePath('/dashboard/grading'); revalidatePath('/dashboard/results'); revalidatePath('/dashboard/reports'); revalidatePath('/dashboard/analysis'); revalidatePath('/dashboard/reports/template')
   redirect('/dashboard/grading?tab=areas&saved=1')
@@ -144,12 +145,12 @@ async function saveTotalGrading(formData: FormData) {
   })
   if (levelError) {
     if (levelError.code !== 'PGRST202' && !/cannot find the function|does not exist/i.test(levelError.message ?? '')) {
-      redirect(`/dashboard/grading?error=${encodeURIComponent(levelError.message || 'Could not save total grading levels')}&tab=totals`)
+      redirect(`/dashboard/grading?error=${encodeURIComponent(friendlyDbRedirect(levelError) || 'Could not save total grading levels')}&tab=totals`)
     }
     const { error: deleteError } = await supabase.from('report_total_grading_levels').delete().eq('report_template_id', templateId)
-    if (deleteError) redirect(`/dashboard/grading?error=${encodeURIComponent(deleteError.message)}&tab=totals`)
+    if (deleteError) redirect(`/dashboard/grading?error=${encodeURIComponent(friendlyDbRedirect(deleteError) || 'Could not save total grading levels')}&tab=totals`)
     const { error } = await supabase.from('report_total_grading_levels').insert(rows.map(r => ({ ...r, tenant_id: tenantId, report_template_id: templateId, reference_maximum: referenceMax })))
-    if (error) redirect(`/dashboard/grading?error=${encodeURIComponent(error.message)}&tab=totals`)
+    if (error) redirect(`/dashboard/grading?error=${encodeURIComponent(friendlyDbRedirect(error) || 'Could not save total grading levels')}&tab=totals`)
   }
   revalidatePath('/dashboard/grading'); revalidatePath('/dashboard/results'); revalidatePath('/dashboard/reports'); revalidatePath('/dashboard/analysis'); revalidatePath('/dashboard/reports/template')
   redirect('/dashboard/grading?tab=totals&saved=1')
@@ -169,7 +170,7 @@ export default async function GradingPage({ searchParams }: { searchParams: Prom
   const activeTab = params.tab === 'totals' ? 'totals' : 'areas'
 
   return <main className="main" style={{ maxWidth: 1000, margin: '0 auto' }}><div className="top"><div><div className="eyebrow">Report template configuration</div><h1 className="title">Grading Levels</h1><p className="muted">Configure two independent scales: per Learning Area (0–100 per subject) and the overall Totals (raw marks against a reference total).</p></div><Link className="btn secondary" href="/dashboard/reports/template">Report template</Link></div>
-    {params.error && <div className="notice error">{params.error}</div>}{params.saved && <SuccessToast message={activeTab === 'totals' ? 'Totals grading levels saved' : 'Learning area grading levels saved'} />}
+{params.error && (() => { const idx = params.error.indexOf('|'); return idx > -1 ? <div className="notice error"><span className="font-semibold">{params.error.slice(0, idx)}</span><span className="block text-xs opacity-80 mt-0.5">{params.error.slice(idx + 1)}</span></div> : <div className="notice error">{params.error}</div> })()}{params.saved && <SuccessToast message={activeTab === 'totals' ? 'Totals grading levels saved' : 'Learning area grading levels saved'} />}
 
     <form action={saveGrading} className="card" style={{ marginTop: 6 }}>
       <h2>Learning Area Grading</h2>
