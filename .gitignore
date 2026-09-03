@@ -45,6 +45,9 @@ yarn-debug.log*
 yarn-error.log*
 .vercel/
 
+# Test artifacts (screenshots, logs) — never commit
+test-results/
+
 # Misc
 .DS_Store
 Thumbs.db

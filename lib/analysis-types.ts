@@ -1,13 +1,23 @@
 // Assessment Analysis model types.
 //
 // The CBC palette used for performance levels across every surface (web
-// preview and PDF) so EE/ME/AE/BE are always visually consistent:
-//   EE -> green, ME -> blue, AE -> amber, BE -> red
+// preview and PDF). Covers both the 4-level (EE/ME/AE/BE) and 8-level
+// (EE1..BE2) code sets so charts stay visually consistent and mode-aware.
+// The preferred colour for a level comes from the active grading
+// configuration (lib/grading.ts); these are only fallbacks.
 export const LEVEL_COLOR: Record<string, string> = {
   EE: '#15803d',
   ME: '#2563eb',
   AE: '#d97706',
   BE: '#dc2626',
+  EE1: '#15803d',
+  EE2: '#22c55e',
+  ME1: '#2563eb',
+  ME2: '#60a5fa',
+  AE1: '#d97706',
+  AE2: '#f59e0b',
+  BE1: '#dc2626',
+  BE2: '#f87171',
 }
 
 export const LEVEL_DEFAULT: { code: string; description: string; color: string }[] = [

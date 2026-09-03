@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { limitAuthenticatedRoute } from '@/lib/rate-limit'
 import { getConfiguredAssessmentResults } from '@/lib/results'
 import { getReportTenant, normalizeReportTemplate } from '@/lib/report-template'
-import { getTenantGradingScale } from '@/lib/grading'
+import { getTenantGradingScale, remarkForLevel } from '@/lib/grading'
 import React from 'react'
 
 export const runtime = 'nodejs'
@@ -62,13 +62,11 @@ type PdfProps = {
 }
 
 function ReportPage({ tenant, examName, term, academicYear, className, template, result, openingDate, closingDate, teacherRemarks, principalRemarks, gradingScale = [], teacherName, principalName }: PdfProps) {
-  // Both the class teacher's and principal's remarks read from the learner's
-  // overall/total level description (derived from the configured totals
-  // grading scale). The remark library is only a fallback when no level
-  // description applies.
-  const levelRemark = result.overallDescription
-  const teacherRemark = levelRemark || teacherRemarks?.[0] || ''
-  const principalRemark = levelRemark || principalRemarks?.[0] || ''
+  // Both the class teacher's and principal's remarks read from the school's
+  // ACTUAL configured remark bank, matched to the learner's overall level
+  // (spec §26) — never a hard-coded label or the achievement description.
+  const teacherRemark = remarkForLevel(result.overallLevel, gradingScale, teacherRemarks)
+  const principalRemark = remarkForLevel(result.overallLevel, gradingScale, principalRemarks)
   const componentCount = Number(template.assessmentComponents.midTerm) + Number(template.assessmentComponents.endTerm) + Number(template.assessmentComponents.average)
   const singleScoreColumn = componentCount === 1
   const width = Math.max(1, 2.4 + componentCount + Number(template.results.grade) + Number(template.results.gradeDescription) * 1.7)
@@ -152,7 +150,7 @@ function ReportPage({ tenant, examName, term, academicYear, className, template,
       <View style={styles.financialRow}><Text style={styles.financialLabel}>Next Term Fee</Text><Text style={styles.financialLine}>________________</Text></View>
     </View>
     {(openingDate || closingDate) && <View style={{ marginTop: 8 }}><Text style={{ fontSize: 9 }}>School Closes on <Text style={{ fontWeight: 700 }}>{closingDate ?? '_____________'}</Text> and opens on <Text style={{ fontWeight: 700 }}>{openingDate ?? '_____________'}</Text></Text></View>}
-    {template.additional.teacherComment && <View style={styles.note}><Text>Remark (Class teacher):</Text><Text>{teacherRemark ?? '______________________________________________'}</Text></View>}
+    {template.additional.teacherComment && <View style={styles.note}><Text>Remark (Class teacher):</Text><Text>{teacherRemark || '______________________________________________'}</Text></View>}
     {template.additional.overallComment && <View style={styles.note}><Text>Remark (Principal):</Text><Text>{principalRemark || '______________________________________________'}</Text></View>}
     {template.additional.signatureArea && (
       <View style={styles.signatureBlock}>

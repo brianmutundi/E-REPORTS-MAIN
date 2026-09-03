@@ -350,13 +350,13 @@ export default async function MarksPage({ searchParams }: { searchParams: Promis
 
           {scopeValid && (
             <div className="table-rail">
-              <table className="w-full text-left text-sm text-slate-600 min-w-[44rem]">
+              <table className="w-full text-left text-sm text-slate-600">
                 <thead className="bg-slate-50 border-b border-slate-200 text-[11px] uppercase tracking-wider font-semibold text-slate-500 sticky top-0 z-20">
                   <tr>
-                    <th scope="col" className="sticky left-0 z-30 bg-slate-50 px-4 py-3.5 sm:px-6 w-24">Admission No</th>
-                    <th scope="col" className="sticky left-24 z-30 bg-slate-50 px-4 py-3.5 sm:px-6 min-w-56">Student Name</th>
-                    <th scope="col" className="px-4 py-3.5 sm:px-6 w-52 text-right">Score (/100)</th>
-                    <th scope="col" className="px-4 py-3.5 sm:px-6">Status</th>
+                    <th scope="col" className="md:sticky md:left-0 z-30 bg-slate-50 px-3 py-3 sm:px-4 sm:py-3.5 lg:px-6 w-14 sm:w-24">Admission No</th>
+                    <th scope="col" className="md:sticky md:left-14 sm:md:left-24 z-30 bg-slate-50 px-3 py-3 sm:px-4 sm:py-3.5 lg:px-6 min-w-0 sm:min-w-56">Student Name</th>
+                    <th scope="col" className="px-3 py-3 sm:px-4 sm:py-3.5 lg:px-6 min-w-28 sm:w-52 text-right">Score (/100)</th>
+                    <th scope="col" className="px-3 py-3 sm:px-4 sm:py-3.5 lg:px-6">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -366,13 +366,13 @@ export default async function MarksPage({ searchParams }: { searchParams: Promis
                       const isEntered = existingScore !== undefined
                       return (
                         <tr key={s.id} className="group hover:bg-slate-50/80 transition-colors">
-                          <td className="sticky left-0 z-10 bg-white group-hover:bg-slate-50/80 transition-colors px-4 py-4 sm:px-6 font-mono text-xs font-semibold text-slate-700 whitespace-nowrap">
+                          <td className="md:sticky md:left-0 z-10 bg-white group-hover:bg-slate-50/80 transition-colors px-3 py-3 sm:px-4 sm:py-4 lg:px-6 font-mono text-xs font-semibold text-slate-700 whitespace-nowrap w-14 sm:w-24">
                             {s.admission_no}
                           </td>
-                          <td className="sticky left-24 z-10 bg-white group-hover:bg-slate-50/80 transition-colors px-4 py-4 sm:px-6 font-medium text-slate-900 whitespace-nowrap">
+                          <td className="md:sticky md:left-14 sm:md:left-24 z-10 bg-white group-hover:bg-slate-50/80 transition-colors px-3 py-3 sm:px-4 sm:py-4 lg:px-6 font-medium text-slate-900 whitespace-nowrap min-w-0 sm:min-w-56">
                             {s.full_name}
                           </td>
-                          <td className="px-4 py-4 sm:px-6">
+                          <td className="px-3 py-3 sm:px-4 sm:py-4 lg:px-6 min-w-28 sm:min-w-0">
                             <input
                               type="hidden"
                               name={`prev_${s.id}`}
@@ -385,7 +385,7 @@ export default async function MarksPage({ searchParams }: { searchParams: Promis
                               ariaLabel={`Score for ${s.full_name}`}
                             />
                           </td>
-                          <td className="px-4 py-4 sm:px-6">
+                          <td className="px-3 py-3 sm:px-4 sm:py-4 lg:px-6">
                             {isEntered ? (
                               <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200/60 px-2.5 py-0.5 rounded-full">
                                 <CheckCircle className="h-3 w-3" /> Recorded
