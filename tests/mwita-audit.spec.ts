@@ -64,21 +64,31 @@ interface ScreenReport {
   docScrollW: number
 }
 
-async function doLogin(page: Page): Promise<{ ok: boolean; finalUrl: string; error?: string }> {
-  try {
-    await page.goto(`${BASE}/login`, { waitUntil: 'networkidle', timeout: 30000 })
-    await page.waitForSelector('#username', { timeout: 15000 })
-    await page.fill('#username', EMAIL)
-    await page.fill('#password', PASSWORD)
-    // Remove autocoComplete interference; click the actual submit button.
-    await page.click('button[type="submit"]')
-    // The client route replaces to /dashboard after a successful login.
-    await page.waitForURL('**/dashboard**', { timeout: 20000 }).catch(() => {})
-    await page.waitForTimeout(1500)
-    return { ok: page.url().includes('/dashboard'), finalUrl: page.url() }
-  } catch (e: any) {
-    return { ok: false, finalUrl: page.url(), error: e?.message }
+async function doLogin(page: Page): Promise<{ ok: boolean; finalUrl: string; error?: string; attempts: number }> {
+  let lastError: string | undefined
+  let attempts = 0
+  for (let t = 0; t < 2; t++) {
+    attempts++
+    try {
+      await page.goto(`${BASE}/login`, { waitUntil: 'networkidle', timeout: 30000 })
+      await page.waitForSelector('#username', { timeout: 15000 })
+      await page.fill('#username', EMAIL)
+      await page.fill('#password', PASSWORD)
+      await page.click('button[type="submit"]')
+      await page.waitForURL('**/dashboard**', { timeout: 20000 }).catch(() => {})
+      await page.waitForTimeout(1500)
+      if (page.url().includes('/dashboard')) {
+        return { ok: true, finalUrl: page.url(), attempts }
+      }
+      lastError = 'no redirect to /dashboard'
+    } catch (e: any) {
+      lastError = e?.message
+    }
+    // Transient throttle/rate-limit on auth — brief pause then retry (a real
+    // user would do the same rather than being locked out of the check).
+    await new Promise((r) => setTimeout(r, 4000))
   }
+  return { ok: false, finalUrl: page.url(), error: lastError, attempts }
 }
 
 async function auditScreen(page: Page, s: { label: string; path: string }): Promise<ScreenReport> {
@@ -164,7 +174,7 @@ async function run() {
 
     // 1) Login via real UI
     const login = await doLogin(page)
-    console.log(` [LOGIN] ok=${login.ok} -> ${login.finalUrl}`)
+    console.log(` [LOGIN] ok=${login.ok} -> ${login.finalUrl} (attempts=${login.attempts})`)
     if (!login.ok) await page.screenshot({ path: join(SHOTS, `${vp.name}-login-fail.png`), fullPage: true })
     const loginOk = login.ok
 
@@ -207,6 +217,12 @@ async function run() {
     overall.push({ vp: vp.name, loginOk, failPairs })
 
     await context.close()
+
+    // Space out the per-viewport real-UI logins to avoid tripping the app's
+    // brute-force throttle / Supabase auth rate limits during the suite.
+    if (vp.name !== VIEWPORTS[VIEWPORTS.length - 1].name) {
+      await new Promise((r) => setTimeout(r, 6000))
+    }
   }
 
   await browser.close()

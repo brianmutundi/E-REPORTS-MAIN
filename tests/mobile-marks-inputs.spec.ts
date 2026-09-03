@@ -15,6 +15,8 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:3099'
+const BASE_HOST = new URL(BASE).hostname
+const BASE_SECURE = BASE.startsWith('https://')
 const EMAIL = process.env.TEST_EMAIL ?? 'loadtest01@school.test'
 const PASSWORD = process.env.TEST_PASSWORD ?? 'TestPass123!'
 const SB_URL = 'https://oakznwbqzcbxzkemvoce.supabase.co'
@@ -94,15 +96,15 @@ async function main() {
       'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
   })
 
-  // Set the session cookie before any navigation
+  // Set the session cookie before any navigation, scoped to the target host.
   await context.addCookies([
     {
       name: cookieKey,
       value: cookieValue,
-      domain: 'localhost',
+      domain: BASE_HOST,
       path: '/',
       httpOnly: false,
-      secure: false,
+      secure: BASE_SECURE,
       sameSite: 'Lax',
     },
   ])
