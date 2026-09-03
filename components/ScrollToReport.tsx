@@ -7,8 +7,12 @@ import { useEffect } from 'react'
  * document renders below the (often long) student list. Without auto-scrolling
  * the page would appear unchanged after clicking "View Report", hiding the
  * report and its "Generate PDF" action. This component scrolls the selected
- * report into view, re-attempting whenever the selection changes and keeping
- * the report in view even while it re-renders.
+ * report into view whenever the selection changes.
+ *
+ * The report is rendered client-side (RSC) and can re-lay-out several times
+ * while a new student's report streams in, so this keeps scrolling until the
+ * report is actually in (and stays in) the viewport before standing down —
+ * avoiding both premature stops and fighting the user afterward.
  */
 export default function ScrollToReport({ studentId }: { studentId: string | null }) {
   useEffect(() => {
@@ -16,6 +20,7 @@ export default function ScrollToReport({ studentId }: { studentId: string | null
 
     let cancelled = false
     let settled = false
+    let inViewStreak = 0
     let tries = 0
     let interval: ReturnType<typeof setInterval> | null = null
     let observer: MutationObserver | null = null
@@ -29,29 +34,33 @@ export default function ScrollToReport({ studentId }: { studentId: string | null
     const scrollOnce = () => {
       if (cancelled || settled) return
       const report = document.querySelector<HTMLElement>('.report')
-      if (!report) return
+      if (!report) {
+        inViewStreak = 0
+        return
+      }
       const rect = report.getBoundingClientRect()
       const inView = rect.top >= -60 && rect.top < window.innerHeight - 80
       if (inView) {
-        // Nudge to the very top once (report header + Generate PDF button).
-        if (rect.top > 160) report.scrollIntoView({ behavior: 'smooth', block: 'start' })
-        settled = true
-        stop()
+        // Report must stay in view across consecutive polls before we stand
+        // down, so a report still settling into its final position doesn't
+        // cause a premature stop.
+        inViewStreak += 1
+        if (inViewStreak >= 2) {
+          settled = true
+          stop()
+        }
         return
       }
-      report.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      inViewStreak = 0
+      report.scrollIntoView({ behavior: 'auto', block: 'start' })
     }
 
-    // The report can enter the DOM/move well after this effect first runs on a
-    // client-side "View Report" click (RSC) and can keep re-rendering while a
-    // new student's report streams in. React to mutations and poll as a
-    // fallback, converging on the report being in the viewport before stopping.
     observer = new MutationObserver(() => scrollOnce())
     observer.observe(document.body, { childList: true, subtree: true })
     interval = setInterval(() => {
-      if (tries++ >= 40) stop()
+      if (tries++ >= 60) stop()
       else scrollOnce()
-    }, 300)
+    }, 250)
 
     return () => {
       cancelled = true
