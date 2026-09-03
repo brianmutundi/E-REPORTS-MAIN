@@ -36,10 +36,10 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
 
   // Derived filter options for the selected grade.
   const snapshotComponent = reportTypeIsSnapshot(reportType as ReportType) ? reportType : null
-  // Assessment options for snapshot types, filtered by the report type's component.
-  const examComponentMap: Partial<Record<ReportType, string | null>> = { test: 'test_exam', mid_term: 'mid_term', end_term: 'end_term' }
+  // Assessment options for snapshot types: show every exam linked to the class,
+  // so existing assessments are selectable regardless of how the component was
+  // classified at entry time.
   const assessmentOptions = snapshotComponent ? (scopeExams as any[])
-    .filter(e => e.assessment_component === examComponentMap[snapshotComponent as ReportType])
     .map(e => ({ value: e.id, label: `${e.name}${e.term ? ` · ${e.term}` : ''}${e.academic_year ? ` · ${e.academic_year}` : ''}` })) : []
   // Distinct terms from exams that actually have this class linked (recorded data basis).
   const termOptions = snapshotComponent ? [] : [...new Set((scopeExams as any[])
