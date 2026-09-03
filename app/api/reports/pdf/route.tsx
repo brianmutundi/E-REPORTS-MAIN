@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { limitAuthenticatedRoute } from '@/lib/rate-limit'
 import { getConfiguredAssessmentResults } from '@/lib/results'
 import { getReportTenant, normalizeReportTemplate } from '@/lib/report-template'
-import { getTenantGradingScale, remarkForLevel } from '@/lib/grading'
+import { getTenantGradingScale, getTenantRemarkBanks, remarkBandForPercent, type RemarkBanks } from '@/lib/grading'
 import React from 'react'
 
 export const runtime = 'nodejs'
@@ -36,6 +36,7 @@ const styles = StyleSheet.create({
   financialLine: { minWidth: 110, textAlign: 'right' },
   signatureBlock: { marginTop: 30 },
   signatureRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 8, borderTop: '1 solid #777', paddingTop: 6 },
+  roleRemark: { marginTop: 6 },
   gradingKey: { marginTop: 12, border: '1 solid #333', width: '100%' },
   gradingKeyHeader: { backgroundColor: '#e6e6e6', textAlign: 'center', fontWeight: 700, paddingVertical: 3, borderBottom: '1 solid #333', fontSize: 11 },
   gradingKeyRow: { flexDirection: 'row' },
@@ -56,17 +57,19 @@ type PdfProps = {
   closingDate?: string | null
   teacherRemarks?: string[]
   principalRemarks?: string[]
+  remarkBanks?: RemarkBanks
   gradingScale?: { grade: string; min: number; max: number; description: string; sort_order?: number }[]
   teacherName?: string | null
   principalName?: string | null
 }
 
-function ReportPage({ tenant, examName, term, academicYear, className, template, result, openingDate, closingDate, teacherRemarks, principalRemarks, gradingScale = [], teacherName, principalName }: PdfProps) {
-  // Both the class teacher's and principal's remarks read from the school's
-  // ACTUAL configured remark bank, matched to the learner's overall level
+function ReportPage({ tenant, examName, term, academicYear, className, template, result, openingDate, closingDate, remarkBanks, gradingScale = [], teacherName, principalName }: PdfProps) {
+  // Both the class teacher's and principal's remarks come from the school's
+  // ACTUAL configured remark bank, matched to the learner's overall percentage
   // (spec §26) — never a hard-coded label or the achievement description.
-  const teacherRemark = remarkForLevel(result.overallLevel, gradingScale, teacherRemarks)
-  const principalRemark = remarkForLevel(result.overallLevel, gradingScale, principalRemarks)
+  const overallPercent = result.total != null && result.expectedSubjects > 0 ? (result.total / (result.expectedSubjects * 100)) * 100 : null
+  const teacherRemark = remarkBandForPercent(overallPercent, remarkBanks, 'class_teacher')
+  const principalRemark = remarkBandForPercent(overallPercent, remarkBanks, 'principal')
   const componentCount = Number(template.assessmentComponents.midTerm) + Number(template.assessmentComponents.endTerm) + Number(template.assessmentComponents.average)
   const singleScoreColumn = componentCount === 1
   const width = Math.max(1, 2.4 + componentCount + Number(template.results.grade) + Number(template.results.gradeDescription) * 1.7)
@@ -150,12 +153,18 @@ function ReportPage({ tenant, examName, term, academicYear, className, template,
       <View style={styles.financialRow}><Text style={styles.financialLabel}>Next Term Fee</Text><Text style={styles.financialLine}>________________</Text></View>
     </View>
     {(openingDate || closingDate) && <View style={{ marginTop: 8 }}><Text style={{ fontSize: 9 }}>School Closes on <Text style={{ fontWeight: 700 }}>{closingDate ?? '_____________'}</Text> and opens on <Text style={{ fontWeight: 700 }}>{openingDate ?? '_____________'}</Text></Text></View>}
-    {template.additional.teacherComment && <View style={styles.note}><Text>Remark (Class teacher):</Text><Text>{teacherRemark || '______________________________________________'}</Text></View>}
-    {template.additional.overallComment && <View style={styles.note}><Text>Remark (Principal):</Text><Text>{principalRemark || '______________________________________________'}</Text></View>}
-    {template.additional.signatureArea && (
-      <View style={styles.signatureBlock}>
-        <View style={styles.signatureRow}><Text>Class Teacher&apos;s Name: {teacherName || '____________'}</Text><Text>Sign: ____________</Text><Text>Date: ____________</Text></View>
-        <View style={[styles.signatureRow, { marginTop: 10 }]}><Text>Principal&apos;s Name: {principalName || '____________'}</Text><Text>Sign: ____________</Text><Text>Date: ____________</Text></View>
+    {(template.additional.teacherComment) && (
+      <View style={styles.roleRemark}>
+        <View style={styles.signatureRow}><Text>Grade Class Teacher: ({teacherName || 'Class Teacher&apos;s Name'})</Text><Text>Sign: _____________</Text><Text>Date: _____________</Text></View>
+        <Text style={{ marginTop: 6 }}>Remark (Class teacher&apos;s Remark):</Text>
+        <Text style={{ marginTop: 3, lineHeight: 1.4, fontSize: 8 }}>{teacherRemark || '______________________________________________'}</Text>
+      </View>
+    )}
+    {(template.additional.overallComment) && (
+      <View style={styles.roleRemark}>
+        <View style={[styles.signatureRow, { marginTop: 10 }]}><Text>Principal: ({principalName || 'Principal&apos;s Name'})</Text><Text>Sign: _____________</Text><Text>Date: _____________</Text></View>
+        <Text style={{ marginTop: 6 }}>Remark (Principal&apos;s Remark):</Text>
+        <Text style={{ marginTop: 3, lineHeight: 1.4, fontSize: 8 }}>{principalRemark || '______________________________________________'}</Text>
       </View>
     )}
   </Page>
@@ -198,15 +207,23 @@ export async function GET(request: NextRequest) {
   const selected = studentId ? configured.rows.filter(r => r.studentId === studentId) : configured.rows
   if (!selected.length) return new Response('No report data found', { status: 404 })
 
-  const [{ data: config }, { data: teacherRows }, { data: principalRows }] = templateRow?.id ? await Promise.all([
-    supabase.from('report_template_configs').select('opening_date,closing_date,teacher_remarks_enabled,principal_remarks_enabled').eq('report_template_id', templateRow.id).maybeSingle(),
-    supabase.from('report_teacher_remarks').select('remark,sort_order').eq('report_template_id', templateRow.id).order('sort_order'),
-    supabase.from('report_principal_remarks').select('remark,sort_order').eq('report_template_id', templateRow.id).order('sort_order'),
-  ]) : [{ data: null }, { data: null }, { data: null }]
-  const teacherRemarks = config?.teacher_remarks_enabled ? teacherRows?.map(r => r.remark) ?? [] : []
-  const principalRemarks = config?.principal_remarks_enabled ? principalRows?.map(r => r.remark) ?? [] : []
+  const [{ data: config }, remarkBanks] = templateRow?.id
+    ? await Promise.all([
+        supabase.from('report_template_configs').select('opening_date,closing_date,teacher_remarks_enabled,principal_remarks_enabled').eq('report_template_id', templateRow.id).maybeSingle(),
+        getTenantRemarkBanks(profile.tenant_id),
+      ])
+    : [{ data: null }, undefined]
+  const teacherRemarkEnabled = config?.teacher_remarks_enabled !== false
+  const principalRemarkEnabled = config?.principal_remarks_enabled !== false
+  const banks: RemarkBanks | undefined =
+    teacherRemarkEnabled && principalRemarkEnabled
+      ? remarkBanks
+      : remarkBanks && {
+          class_teacher: teacherRemarkEnabled ? remarkBanks.class_teacher : [],
+          principal: principalRemarkEnabled ? remarkBanks.principal : [],
+        }
 
-  const pdf = await renderToBuffer(<Document>{selected.map(result => <ReportPage key={result.studentId} tenant={tenant} examName={exam.name} term={exam.term} academicYear={exam.academic_year} className={scope.className} template={template} result={result} openingDate={config?.opening_date} closingDate={config?.closing_date} teacherRemarks={teacherRemarks} principalRemarks={principalRemarks} gradingScale={gradingScale} teacherName={scope.teacherName} principalName={scope.principalName} />)}</Document>)
+  const pdf = await renderToBuffer(<Document>{selected.map(result => <ReportPage key={result.studentId} tenant={tenant} examName={exam.name} term={exam.term} academicYear={exam.academic_year} className={scope.className} template={template} result={result} openingDate={config?.opening_date} closingDate={config?.closing_date} remarkBanks={banks} gradingScale={gradingScale} teacherName={scope.teacherName} principalName={scope.principalName} />)}</Document>)
   const filename = studentId ? `report-${selected[0].admissionNo}.pdf` : `reports-${scope.className.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.pdf`
   return new Response(pdf as unknown as BodyInit, { headers: { 'Content-Type': 'application/pdf', 'Content-Disposition': `attachment; filename="${filename}"`, 'Cache-Control': 'no-store' } })
 }

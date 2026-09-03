@@ -421,8 +421,8 @@ export function defaultRemarkBanks(): RemarkBanks {
  * narrative remark band. These are deliberately independent of the EE/ME/AE/BE
  * performance scale — remarks are narrative, not graded on that scale.
  */
-export function remarkBandForPercent(percent: number | null | undefined, banks: RemarkBanks, role: RemarkRole): string {
-  const bank = banks[role]
+export function remarkBandForPercent(percent: number | null | undefined, banks: RemarkBanks | undefined | null, role: RemarkRole): string {
+  const bank = banks?.[role]
   if (!bank?.length || percent === null || percent === undefined || !Number.isFinite(percent)) return ''
   let key: RemarkBand
   if (percent >= 75) key = 'excellent'
@@ -459,16 +459,46 @@ export async function getTenantRemarkBanks(tenantId: string): Promise<RemarkBank
 export async function getTenantTotalGradingScale(tenantId: string): Promise<TotalGradingScale | null> {
   const supabase = await createClient()
   const { data: template } = await supabase.from('report_templates').select('id').eq('tenant_id', tenantId).eq('is_default', true).maybeSingle()
-  if (!template?.id) return defaultTotalGradingScale()
+  // Resolve reference maximum from the legacy totals config if present.
+  let referenceMaximum = 700
+  if (template?.id) {
+    const ref = await supabase
+      .from('report_total_grading_levels')
+      .select('reference_maximum')
+      .eq('tenant_id', tenantId)
+      .eq('report_template_id', template.id)
+      .order('sort_order')
+      .limit(1)
+      .maybeSingle()
+    if (!ref.error && ref.data && Number(ref.data.reference_maximum)) referenceMaximum = Number(ref.data.reference_maximum)
+  }
+  // The active grading configuration is the single authority: when the school
+  // has switched to the 8-level scale, the overall/total grade must follow it
+  // (spec: config mode drives learning areas AND overall), so the totals scale
+  // is derived from the configured percentage levels in that mode.
+  const config = await getActiveGradingConfiguration(tenantId)
+  if (config.levels.length && config.mode === '8') {
+    return {
+      referenceMaximum,
+      rules: config.levels.map(l => ({
+        grade: l.grade,
+        min: Number((referenceMaximum * l.min) / 100),
+        max: Number((referenceMaximum * l.max) / 100),
+        description: l.description,
+        sort_order: l.sort_order ?? 0,
+      })),
+    }
+  }
+  if (!template?.id) return defaultTotalGradingScale(referenceMaximum)
   const { data, error } = await supabase
     .from('report_total_grading_levels')
     .select('level_code,min_score,max_score,description,sort_order,reference_maximum')
     .eq('tenant_id', tenantId)
     .eq('report_template_id', template.id)
     .order('sort_order')
-  if (error || !data?.length) return defaultTotalGradingScale(Number(data?.[0]?.reference_maximum) || 700)
+  if (error || !data?.length) return defaultTotalGradingScale(referenceMaximum)
   return {
-    referenceMaximum: Number(data[0].reference_maximum),
+    referenceMaximum: Number(data[0].reference_maximum) || referenceMaximum,
     rules: data.map(r => ({
       grade: r.level_code, min: Number(r.min_score), max: Number(r.max_score),
       description: r.description, sort_order: r.sort_order,
