@@ -16,18 +16,13 @@ export type ReportTemplate = {
 }
 
 export const defaultAssessmentComponents: AssessmentComponents = {
-  // All assessment components are now compulsory: every report renders the
-  // Mid Term, End Term and Average columns (choice-based toggles removed).
+  // Defaults are applied when a template has not stored its own choice.
   midTerm: true,
   endTerm: true,
   average: true,
 }
 
 export const defaultReportTemplate: ReportTemplate = {
-  // Every report component is now compulsory (no choice-based toggles), so
-  // the visibility flags are all forced on both in the seed and at
-  // normalization time. Old stored templates with sections turned off are
-  // upgraded to show everything.
   school: { name: true, logo: true, contact: true },
   student: { name: true, admissionNo: true, className: true, stream: true },
   examination: { name: true, academicYear: true, term: true },
@@ -61,16 +56,24 @@ function bool(value: unknown, fallback: boolean) {
 }
 
 export function normalizeAssessmentComponents(value: unknown): AssessmentComponents {
-  void value
-  // Assessment components are compulsory — always all three columns.
-  return { midTerm: true, endTerm: true, average: true }
+  const v = (value && typeof value === 'object' ? value : {}) as Record<string, unknown>
+  return {
+    midTerm: bool(v.midTerm, defaultAssessmentComponents.midTerm),
+    endTerm: bool(v.endTerm, defaultAssessmentComponents.endTerm),
+    average: bool(v.average, defaultAssessmentComponents.average),
+  }
 }
 
 export function normalizeReportTemplate(value: unknown): ReportTemplate {
-  void value
-  // Choice-based component toggles are removed: every component is compulsory,
-  // so the normalized template always shows everything on every report.
-  return structuredClone(defaultReportTemplate)
+  const v = (value && typeof value === 'object' ? value : {}) as Record<string, any>
+  return {
+    school: { name: bool(v.school?.name, true), logo: bool(v.school?.logo, true), contact: bool(v.school?.contact, false) },
+    student: { name: bool(v.student?.name, true), admissionNo: bool(v.student?.admissionNo, true), className: bool(v.student?.className, true), stream: bool(v.student?.stream, false) },
+    examination: { name: bool(v.examination?.name, true), academicYear: bool(v.examination?.academicYear, true), term: bool(v.examination?.term, true) },
+    results: { learningArea: bool(v.results?.learningArea, true), marks: bool(v.results?.marks, true), grade: bool(v.results?.grade, true), gradeDescription: bool(v.results?.gradeDescription, true), total: bool(v.results?.total, true), average: bool(v.results?.average, true), position: bool(v.results?.position, true) },
+    additional: { teacherComment: bool(v.additional?.teacherComment, false), overallComment: bool(v.additional?.overallComment, false), signatureArea: bool(v.additional?.signatureArea, true) },
+    assessmentComponents: normalizeAssessmentComponents(v.assessmentComponents),
+  }
 }
 
 export const templateFields: { section: keyof Omit<ReportTemplate, 'assessmentComponents'>; key: string; label: string }[] = [
