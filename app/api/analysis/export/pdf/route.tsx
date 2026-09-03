@@ -132,21 +132,23 @@ function DoughnutSvg({ levels }: { levels: AnalysisLevel[] }) {
   const rI = rO - 26
   let angle = 0
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-      <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-        {total === 0
-          ? <Circle cx={cx} cy={cy} r={(rO + rI) / 2} fill="none" stroke="#e2e8f0" strokeWidth={26} />
-          : levels.map((lv) => {
-              if (lv.count <= 0) return null
-              const sweep = (lv.count / total) * 360
-              const d = donutSeg(cx, cy, rO, rI, angle, angle + sweep)
-              angle += sweep
-              return <Path key={lv.code} d={d} fill={lv.color} stroke="#ffffff" strokeWidth={1} />
-            })}
-        <SText x={cx} y={cy - 2} textAnchor="middle" fontSize={18} fontFamily={F.bold} fill="#0f172a">{total}</SText>
-        <SText x={cx} y={cy + 14} textAnchor="middle" fontSize={9} fill="#94a3b8">assessed</SText>
-      </Svg>
-      <View style={{ marginLeft: 12, flex: 1 }}>
+    <View>
+      <View style={{ alignItems: 'center', marginBottom: 8 }}>
+        <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+          {total === 0
+            ? <Circle cx={cx} cy={cy} r={(rO + rI) / 2} fill="none" stroke="#e2e8f0" strokeWidth={26} />
+            : levels.map((lv) => {
+                if (lv.count <= 0) return null
+                const sweep = (lv.count / total) * 360
+                const d = donutSeg(cx, cy, rO, rI, angle, angle + sweep)
+                angle += sweep
+                return <Path key={lv.code} d={d} fill={lv.color} stroke="#ffffff" strokeWidth={1} />
+              })}
+          <SText x={cx} y={cy - 2} textAnchor="middle" fontSize={18} fontFamily={F.bold} fill="#0f172a">{total}</SText>
+          <SText x={cx} y={cy + 14} textAnchor="middle" fontSize={9} fill="#94a3b8">assessed</SText>
+        </Svg>
+      </View>
+      <View>
         {levels.map((lv) => (
           <View key={lv.code} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 3 }}>
             <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: lv.color, marginRight: 5 }} />
@@ -340,7 +342,10 @@ function AnalysisPdf({ model }: { model: AssessmentAnalysisModel }) {
   const { scope, learningAreas, maxTotal, enrolledCount, assessedCount, coveragePercentage, classMeanPercentage, medianPercentage, standardDeviation, highestPercentage, lowestPercentage, topLearner, performanceDistribution, learningAreaResults, ranking, scoreDistribution, trend, anomalies, unassessedLearners, insights, recommendations, coverageWarning } = model
 
   const streamLine = [scope.gradeName, scope.streamName].filter(Boolean).join(' · ')
-  const subtitle = [scope.examName, scope.term, scope.academicYear].filter(Boolean).join(' · ')
+  // Avoid repeating the academic year when it is already part of the exam
+  // label (e.g. "END TERM 2026 · Term 1 · 2026" would repeat the year).
+  const year = scope.academicYear ? String(scope.academicYear) : null
+  const subtitle = [scope.examName, scope.term, year && !scope.examName.includes(year) ? year : null].filter(Boolean).join(' · ')
   const pageHeaderText = `${scope.schoolName} · Assessment Analysis · ${streamLine}`
   const generated = new Date(model.generatedAt)
   const genStr = generated.toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
@@ -391,7 +396,7 @@ function AnalysisPdf({ model }: { model: AssessmentAnalysisModel }) {
           <View style={[styles.kpi, { borderLeftColor: '#2563eb', borderLeftWidth: 3 }]}>
             <Text style={styles.kpiLabel}>CLASS MEAN</Text>
             <Text style={styles.kpiValue}>{fmt1(classMeanPercentage)}%</Text>
-            <Text style={styles.kpiSub}>of {assessedCount} assessed</Text>
+            <Text style={styles.kpiSub}>mean across {assessedCount} assessed</Text>
           </View>
           <View style={[styles.kpi, { borderLeftColor: '#d97706', borderLeftWidth: 3 }]}>
             <Text style={styles.kpiLabel}>TOP LEARNER</Text>
@@ -401,7 +406,7 @@ function AnalysisPdf({ model }: { model: AssessmentAnalysisModel }) {
           <View style={[styles.kpi, { borderLeftColor: '#7c3aed', borderLeftWidth: 3 }]}>
             <Text style={styles.kpiLabel}>LEARNING AREAS</Text>
             <Text style={styles.kpiValue}>{learningAreas.length}</Text>
-            <Text style={styles.kpiSub}>max total {maxTotal}</Text>
+            <Text style={styles.kpiSub}>max total {maxTotal} ({learningAreas.length} × 100 each)</Text>
           </View>
         </View>
 
@@ -422,7 +427,7 @@ function AnalysisPdf({ model }: { model: AssessmentAnalysisModel }) {
           <View style={{ flex: 1, marginHorizontal: 5 }}>
             <ClassStatRow label="Mean %" value={`${fmt1(classMeanPercentage)}%`} />
             <ClassStatRow label="Median %" value={`${fmt1(medianPercentage)}%`} />
-            <ClassStatRow label="Std Deviation" value={fmt1(standardDeviation)} />
+            <ClassStatRow label="Std Deviation" value={`${fmt1(standardDeviation)}%`} />
             <ClassStatRow label="Highest %" value={`${fmt1(highestPercentage)}%`} />
             <ClassStatRow label="Lowest %" value={`${fmt1(lowestPercentage)}%`} />
             <ClassStatRow label="Data Coverage" value={`${fmt2(coveragePercentage)}%`} />
@@ -439,8 +444,8 @@ function AnalysisPdf({ model }: { model: AssessmentAnalysisModel }) {
         <SectionTitle>Learning Area Performance</SectionTitle>
         <LearningAreaBarSvg items={learningAreaResults} />
         <View style={{ flexDirection: 'row', marginTop: 4 }}>
-          <Legend color="#15803d" label="≥ 70%" />
-          <Legend color="#d97706" label="50–69.9%" />
+          <Legend color="#15803d" label=">= 70%" />
+          <Legend color="#d97706" label="50-69.9%" />
           <Legend color="#dc2626" label="< 50%" />
         </View>
         <Text style={{ ...styles.caption, marginTop: 6, marginBottom: 4 }}>Highest / lowest learner per Learning Area (assessed learners only):</Text>

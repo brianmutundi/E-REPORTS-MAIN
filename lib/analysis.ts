@@ -52,6 +52,12 @@ function formatCd(n: number): string {
   return (Math.round(n * 100) / 100).toFixed(2)
 }
 
+// One-decimal formatter shared with the PDF/Learning Area table so stats shown
+// in prose (insights/recommendations) match the same figures used in tables.
+function formatPct1(n: number): string {
+  return n.toFixed(1)
+}
+
 /**
  * Builds the full Assessment Analysis model for a single Grade (+ optional
  * Stream) scope from the application's real Supabase data.
@@ -282,17 +288,25 @@ export async function buildAssessmentAnalysis(params: AnalysisQueryParams): Prom
     }
   })
 
-  // Score distribution histogram.
-  const bins: { label: string; from: number; to: number }[] = [
-    { label: '0–20%', from: 0, to: 20 },
-    { label: '21–40%', from: 21, to: 40 },
-    { label: '41–60%', from: 41, to: 60 },
-    { label: '61–80%', from: 61, to: 80 },
-    { label: '81–100%', from: 81, to: 100 },
+  // Score distribution histogram. Each learner's overall percentage is rounded
+  // to the nearest whole number and bucketed into the band that contains that
+  // integer. Using the rounded integer guarantees every learner is counted
+  // exactly once (contiguous, non-overlapping bands) so the bins always sum to
+  // the number of assessed learners — a fractional score sitting inside a
+  // boundary gap (e.g. 40.9% or 60.7%) is never dropped.
+  const bins: { label: string; min: number; max: number }[] = [
+    { label: '0–20%', min: 0, max: 20 },
+    { label: '21–40%', min: 21, max: 40 },
+    { label: '41–60%', min: 41, max: 60 },
+    { label: '61–80%', min: 61, max: 80 },
+    { label: '81–100%', min: 81, max: 100 },
   ]
   const scoreDistribution: HistogramBin[] = bins.map((b) => {
-    const count = percents.filter((p) => p >= b.from - 0.0001 && p <= b.to + 0.0001).length
-    return { label: b.label, from: b.from, to: b.to, count, percentage: assessedCount ? (count / assessedCount) * 100 : null }
+    const count = percents.filter((p) => {
+      const r = Math.round(p)
+      return r >= b.min && r <= b.max
+    }).length
+    return { label: b.label, from: b.min, to: b.max, count, percentage: assessedCount ? (count / assessedCount) * 100 : null }
   })
 
   // Insights + recommendations generated from actual values.
@@ -313,18 +327,18 @@ export async function buildAssessmentAnalysis(params: AnalysisQueryParams): Prom
         const diff = (strongest.meanPercentage ?? 0) - overall
         insights.push({
           kind: diff >= 0 ? 'strength' : 'info',
-          text: `${strongest.subjectName} is the strongest Learning Area at ${formatCd(strongest.meanPercentage ?? 0)}%, ${diff >= 0 ? 'exceeding' : 'differing from'} the overall Grade mean by ${Math.abs(diff).toFixed(1)} percentage points.`,
+          text: `${strongest.subjectName} is the strongest Learning Area at ${formatPct1(strongest.meanPercentage ?? 0)}%, ${diff >= 0 ? 'exceeding' : 'differing from'} the overall Grade mean by ${Math.abs(diff).toFixed(1)} percentage points.`,
         })
         recommendations.push({
           category: 'Learning Area Support',
-          text: `${strongest.subjectName} is a relative strength at ${formatCd(strongest.meanPercentage ?? 0)}%; consider modelling the approach used there.`,
+          text: `${strongest.subjectName} is a relative strength at ${formatPct1(strongest.meanPercentage ?? 0)}%; consider modelling the approach used there.`,
         })
       }
       if (weakest && isFiniteNum(weakest.meanPercentage)) {
         const diff = overall - (weakest.meanPercentage ?? 0)
         insights.push({
           kind: 'weakness',
-          text: `${weakest.subjectName} is the weakest Learning Area at ${formatCd(weakest.meanPercentage ?? 0)}%, approximately ${diff.toFixed(1)} percentage points below the overall Grade mean.`,
+          text: `${weakest.subjectName} is the weakest Learning Area at ${formatPct1(weakest.meanPercentage ?? 0)}%, approximately ${diff.toFixed(1)} percentage points below the overall Grade mean.`,
         })
         recommendations.push({ category: 'Learning Area Support', text: `Prioritise reinforcement in ${weakest.subjectName}.` })
       }
