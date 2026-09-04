@@ -131,6 +131,19 @@ async function getExamContext(supabase: Awaited<ReturnType<typeof import('@/lib/
   return { id: exam.id, name: exam.name, term: exam.term, academic_year: exam.academic_year, assessment_component: exam.assessment_component as ExamContext['assessment_component'] }
 }
 
+/**
+ * Older examinations may predate assessment_component and therefore have a
+ * null component. Infer the component from the examination name only for
+ * those legacy rows; explicit database values always take precedence.
+ */
+function inferAssessmentComponent(name: string, component: string | null): 'mid_term' | 'end_term' | null {
+  if (component === 'mid_term' || component === 'end_term') return component
+  const normalized = name.trim().toLowerCase().replace(/[-_]+/g, ' ')
+  if (/\bmid(?:\s+term)?\b|\bmidterm\b/.test(normalized)) return 'mid_term'
+  if (/\bend(?:\s+term)?\b|\bendterm\b/.test(normalized)) return 'end_term'
+  return null
+}
+
 export async function getConfiguredAssessmentResults(
   examId: string,
   classId: string,
@@ -143,25 +156,27 @@ export async function getConfiguredAssessmentResults(
   const selectedExam = await getExamContext(supabase, tenantId, examId, classId)
   if (!selectedExam) return { rows: [], selectedExam: null, midExamId: null, endExamId: null, error: 'The selected examination or class is not available.' }
 
-  const effectiveSelectedComponent = selectedExam.assessment_component ?? 'end_term'
+  const effectiveSelectedComponent = inferAssessmentComponent(selectedExam.name, selectedExam.assessment_component)
   let midExamId: string | null = components.midTerm && effectiveSelectedComponent === 'mid_term' ? selectedExam.id : null
   let endExamId: string | null = components.endTerm && effectiveSelectedComponent === 'end_term' ? selectedExam.id : null
 
   const needsMid = components.midTerm && !midExamId
   const needsEnd = components.endTerm && !endExamId
   if (needsMid || needsEnd) {
+    // Include legacy examinations with a null assessment_component. They are
+    // classified by name below so existing Mid Term/End Term data continues
+    // to work after the assessment-component migration.
     const { data: allCandidates } = await supabase.from('exams')
       .select('id,name,term,academic_year,assessment_component,created_at')
       .eq('tenant_id', tenantId)
-      .in('assessment_component', ['mid_term', 'end_term'])
       .order('created_at', { ascending: false })
     const candidates = (allCandidates ?? []).filter(e => e.term === selectedExam.term && e.academic_year === selectedExam.academic_year)
     const ids = candidates.map(e => e.id)
     if (ids.length) {
       const { data: classLinks } = await supabase.from('exam_classes').select('exam_id').eq('class_id', classId).in('exam_id', ids)
       const allowed = new Set((classLinks ?? []).map(x => x.exam_id))
-      if (needsMid) midExamId = candidates.find(e => e.assessment_component === 'mid_term' && allowed.has(e.id))?.id ?? null
-      if (needsEnd) endExamId = candidates.find(e => e.assessment_component === 'end_term' && allowed.has(e.id))?.id ?? null
+      if (needsMid) midExamId = candidates.find(e => inferAssessmentComponent(e.name, e.assessment_component) === 'mid_term' && allowed.has(e.id))?.id ?? null
+      if (needsEnd) endExamId = candidates.find(e => inferAssessmentComponent(e.name, e.assessment_component) === 'end_term' && allowed.has(e.id))?.id ?? null
     }
   }
 
