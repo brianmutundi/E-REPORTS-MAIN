@@ -8,6 +8,7 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: 'OAI-SearchBot',
         allow: '/',
+        disallow: ['/dashboard/', '/api/'],
       },
       {
         userAgent: '*',
