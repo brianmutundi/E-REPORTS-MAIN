@@ -5,7 +5,6 @@ import { getDashboardSession } from '@/lib/supabase/session'
 import { getScopeStreams, getScopeExams, type ScopeStream, type ScopeExam } from '@/lib/scope'
 import CascadingFilterBar from '@/components/CascadingFilterBar'
 import { 
-  Award, 
   FileText, 
   ExternalLink, 
   CheckCircle2, 
@@ -72,24 +71,16 @@ export default async function ResultsPage({
       {/* Header Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-5">
         <div>
-          <p className="eyebrow">Computed Analytics</p>
+          <p className="eyebrow">Computed Results</p>
           <h1 className="title">Examination Results</h1>
           <p className="muted mt-1">
-            Fully assessed students are ranked automatically. Incomplete entries remain visible without ranking.
+            Results are displayed by learner name. Ranking and position are reserved for Assessment Analysis.
           </p>
         </div>
 
         <div className="flex items-center gap-2.5 self-start sm:self-auto">
-          <Link 
-            href="/dashboard/marks" 
-            className="btn secondary"
-          >
-            Marks Entry
-          </Link>
-          <Link 
-            href="/dashboard/reports" 
-            className="btn"
-          >
+          <Link href="/dashboard/marks" className="btn secondary">Marks Entry</Link>
+          <Link href="/dashboard/reports" className="btn">
             <FileText className="h-4 w-4" />
             <span>Report Forms</span>
           </Link>
@@ -148,23 +139,17 @@ export default async function ResultsPage({
             </div>
 
             <div className="flex items-center gap-2">
-                  {selected.complete && selected.streamPosition !== null && selected.streamName && (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold">
-                      {selected.streamName} · {selected.streamPosition}
-                    </span>
-                  )}
-                  {selected.complete ? (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold">
-                      <Award className="h-3.5 w-3.5 text-emerald-600" />
-                      Complete · Position {selected.position}
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold">
-                      <AlertCircle className="h-3.5 w-3.5 text-amber-600" />
-                      Incomplete ({selected.subjects.length}/{selected.expectedSubjects} Learning Areas)
-                    </span>
-                  )}
-                </div>
+              {selected.complete ? (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> Complete
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold">
+                  <AlertCircle className="h-3.5 w-3.5 text-amber-600" />
+                  Incomplete ({selected.subjects.length}/{selected.expectedSubjects} Learning Areas)
+                </span>
+              )}
+            </div>
           </div>
 
           <div className="border border-slate-200/80 rounded-xl overflow-hidden">
@@ -185,13 +170,9 @@ export default async function ResultsPage({
                   return (
                     <tr key={s.subjectId} className="hover:bg-slate-50/60 transition-colors">
                       <td className="px-5 py-3.5 font-medium text-slate-900">{s.subjectName}</td>
-                      <td className="px-5 py-3.5 text-right font-mono font-semibold text-slate-700">
-                        {s.score.toFixed(2)}
-                      </td>
+                      <td className="px-5 py-3.5 text-right font-mono font-semibold text-slate-700">{s.score.toFixed(2)}</td>
                       <td className="px-5 py-3.5 text-center">
-                        <span className="inline-block px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-800 font-bold text-xs">
-                          {subjectGrade}
-                        </span>
+                        <span className="inline-block px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-800 font-bold text-xs">{subjectGrade}</span>
                       </td>
                     </tr>
                   )
@@ -214,10 +195,7 @@ export default async function ResultsPage({
           </div>
 
           <div className="pt-2">
-            <Link 
-              href={`/dashboard/reports?exam=${params.exam}&class=${params.class}${params.stream ? `&stream=${params.stream}` : ''}&student=${selected.studentId}`}
-              className="btn"
-            >
+            <Link href={`/dashboard/reports?exam=${params.exam}&class=${params.class}${params.stream ? `&stream=${params.stream}` : ''}&student=${selected.studentId}`} className="btn">
               <ExternalLink className="h-4 w-4" />
               <span>Generate Official Report Form</span>
             </Link>
@@ -235,40 +213,22 @@ export default async function ResultsPage({
             {tenant?.code ? <p className="text-[11px] font-semibold text-slate-500 mt-0.5">School Code: {tenant.code}</p> : null}
             {tenant?.address ? <p className="text-[11px] font-semibold text-slate-500 mt-0.5">P.O Box: {tenant.address}</p> : null}
             <p className="eyebrow mt-2">Assessment Broadsheet</p>
-            <p className="text-sm font-semibold text-slate-800 mt-1.5">
-              {exam?.name} · {cls?.name}
-            </p>
-            <p className="text-xs text-slate-500 mt-0.5">
-              {[exam?.term, exam?.academic_year].filter(Boolean).join(' · ') || '—'}
-            </p>
+            <p className="text-sm font-semibold text-slate-800 mt-1.5">{exam?.name} · {cls?.name}</p>
+            <p className="text-xs text-slate-500 mt-0.5">{[exam?.term, exam?.academic_year].filter(Boolean).join(' · ') || '—'}</p>
 
             <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
-              <a
-                href={`/api/results/export/xlsx?exam=${params.exam}&class=${params.class}${params.stream ? `&stream=${params.stream}` : ''}`}
-                className="btn"
-                download
-              >
-                <FileSpreadsheet className="h-4 w-4" />
-                <span>Download Excel</span>
+              <a href={`/api/results/export/xlsx?exam=${params.exam}&class=${params.class}${params.stream ? `&stream=${params.stream}` : ''}`} className="btn" download>
+                <FileSpreadsheet className="h-4 w-4" /><span>Download Excel</span>
               </a>
-              <a
-                href={`/api/results/export/pdf?exam=${params.exam}&class=${params.class}${params.stream ? `&stream=${params.stream}` : ''}`}
-                className="btn secondary"
-                download
-              >
-                <FileDown className="h-4 w-4" />
-                <span>Download PDF</span>
+              <a href={`/api/results/export/pdf?exam=${params.exam}&class=${params.class}${params.stream ? `&stream=${params.stream}` : ''}`} className="btn secondary" download>
+                <FileDown className="h-4 w-4" /><span>Download PDF</span>
               </a>
             </div>
-            <p className="text-[11px] text-slate-400 mt-3">
-              {columns.length} Learning Areas · {results.length} Students · Missing scores shown as —
-            </p>
+            <p className="text-[11px] text-slate-400 mt-3">{columns.length} Learning Areas · {results.length} Students · Missing scores shown as —</p>
             {columns.some(c => c.subjectCode) && (
               <div className="mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[11px] text-slate-500">
                 {columns.map(c => (
-                  <span key={c.subjectId}>
-                    <strong className="font-semibold text-slate-600">{c.subjectCode}</strong> = {c.subjectName}
-                  </span>
+                  <span key={c.subjectId}><strong className="font-semibold text-slate-600">{c.subjectCode}</strong> = {c.subjectName}</span>
                 ))}
               </div>
             )}
@@ -278,19 +238,12 @@ export default async function ResultsPage({
             <table className="w-full text-left text-sm text-slate-600 min-w-[46rem]">
               <thead className="bg-slate-50 border-b border-slate-200 text-[11px] uppercase tracking-wider font-semibold text-slate-500 sticky top-0 z-20">
                 <tr>
-                  <th className="sticky left-0 z-30 bg-slate-50 px-3 py-3.5 w-12 text-center">Pos</th>
+                  <th className="sticky left-0 z-30 bg-slate-50 px-3 py-3.5 w-12 text-center">S/N</th>
                   <th className="sticky left-12 z-30 bg-slate-50 px-3 py-3.5 w-24">Adm No</th>
                   <th className="sticky left-36 z-30 bg-slate-50 px-4 py-3.5 min-w-[11rem]">Student Name</th>
-                  {hasStreamData && (
-                    <>
-                      <th className="px-4 py-3.5 min-w-[110px]">Stream</th>
-                      <th className="px-4 py-3.5 w-14 text-center">Str Pos</th>
-                    </>
-                  )}
+                  {hasStreamData && <th className="px-4 py-3.5 min-w-[110px]">Stream</th>}
                   {columns.map(col => (
-                    <th key={col.subjectId} className="px-3 py-3.5 text-right whitespace-nowrap sticky top-0 bg-slate-50" title={col.subjectName}>
-                      {col.subjectCode ?? col.subjectName}
-                    </th>
+                    <th key={col.subjectId} className="px-3 py-3.5 text-right whitespace-nowrap sticky top-0 bg-slate-50" title={col.subjectName}>{col.subjectCode ?? col.subjectName}</th>
                   ))}
                   <th className="px-4 py-3.5 text-right text-emerald-700">Total</th>
                   <th className="px-4 py-3.5 text-right">Average</th>
@@ -298,84 +251,30 @@ export default async function ResultsPage({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {results.length ? (
-                  results.map((r) => (
-                    <tr key={r.studentId} className="group hover:bg-slate-50/80 transition-colors">
-                      <td className="sticky left-0 z-10 bg-white group-hover:bg-slate-50/80 transition-colors px-3 py-3.5 text-center">
-                        {r.complete ? (
-                          <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-slate-100 text-slate-800 text-xs font-bold">
-                            {r.position}
-                          </span>
-                        ) : (
-                          <span className="text-slate-300">—</span>
-                        )}
-                      </td>
-                      <td className="sticky left-12 z-10 bg-white group-hover:bg-slate-50/80 transition-colors px-3 py-3.5 font-mono text-xs font-semibold text-slate-600">
-                        {r.admissionNo}
-                      </td>
-                      <td className="sticky left-36 z-10 bg-white group-hover:bg-slate-50/80 transition-colors px-4 py-3.5">
-                        <Link
-                          href={`/dashboard/results?exam=${params.exam}&class=${params.class}${params.stream ? `&stream=${params.stream}` : ''}&student=${r.studentId}`}
-                          className="font-medium text-slate-900 hover:text-emerald-700 transition-colors"
-                        >
-                          {r.fullName}
-                        </Link>
-                      </td>
-                      {hasStreamData && (
-                        <>
-                          <td className="px-4 py-3.5 text-xs font-semibold text-slate-500">
-                            {r.streamName ?? '—'}
-                          </td>
-                          <td className="px-4 py-3.5 text-center">
-                            {r.complete && r.streamPosition !== null ? (
-                              <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-emerald-50 text-emerald-800 text-xs font-bold">
-                                {r.streamPosition}
-                              </span>
-                            ) : (
-                              <span className="text-slate-300">—</span>
-                            )}
-                          </td>
-                        </>
+                {results.length ? results.map((r, index) => (
+                  <tr key={r.studentId} className="group hover:bg-slate-50/80 transition-colors">
+                    <td className="sticky left-0 z-10 bg-white group-hover:bg-slate-50/80 transition-colors px-3 py-3.5 text-center font-bold text-slate-700">{index + 1}</td>
+                    <td className="sticky left-12 z-10 bg-white group-hover:bg-slate-50/80 transition-colors px-3 py-3.5 font-mono text-xs font-semibold text-slate-600">{r.admissionNo}</td>
+                    <td className="sticky left-36 z-10 bg-white group-hover:bg-slate-50/80 transition-colors px-4 py-3.5">
+                      <Link href={`/dashboard/results?exam=${params.exam}&class=${params.class}${params.stream ? `&stream=${params.stream}` : ''}&student=${r.studentId}`} className="font-medium text-slate-900 hover:text-emerald-700 transition-colors">{r.fullName}</Link>
+                    </td>
+                    {hasStreamData && <td className="px-4 py-3.5 text-xs font-semibold text-slate-500">{r.streamName ?? '—'}</td>}
+                    {columns.map(col => {
+                      const score = r.subjects.find(s => s.subjectId === col.subjectId)?.score
+                      return <td key={col.subjectId} className={`px-3 py-3.5 text-right font-mono tabular-nums text-xs font-semibold ${score === undefined ? 'text-slate-300' : 'text-slate-700'}`}>{score === undefined ? '—' : score.toFixed(2)}</td>
+                    })}
+                    <td className="px-4 py-3.5 text-right font-mono text-sm font-extrabold text-slate-900 bg-emerald-50/60">{r.total.toFixed(2)}</td>
+                    <td className="px-4 py-3.5 text-right font-mono font-semibold text-slate-800">{r.average.toFixed(2)}</td>
+                    <td className="px-4 py-3.5 text-center">
+                      {r.complete ? (
+                        <span className="inline-flex items-center gap-1 font-bold text-xs text-emerald-700 bg-emerald-50 border border-emerald-200/60 px-2.5 py-0.5 rounded-full" title={r.overallDescription}><CheckCircle2 className="h-3 w-3" /> {r.overallLevel}</span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200/60 px-2.5 py-0.5 rounded-full"><AlertCircle className="h-3 w-3" /> Incomplete</span>
                       )}
-                      {columns.map(col => {
-                        const score = r.subjects.find(s => s.subjectId === col.subjectId)?.score
-                        return (
-                          <td
-                            key={col.subjectId}
-                            className={`px-3 py-3.5 text-right font-mono tabular-nums text-xs font-semibold ${score === undefined ? 'text-slate-300' : 'text-slate-700'}`}
-                          >
-                            {score === undefined ? '—' : score.toFixed(2)}
-                          </td>
-                        )
-                      })}
-                      <td className="px-4 py-3.5 text-right font-mono text-sm font-extrabold text-slate-900 bg-emerald-50/60">
-                        {r.total.toFixed(2)}
-                      </td>
-                      <td className="px-4 py-3.5 text-right font-mono font-semibold text-slate-800">
-                        {r.average.toFixed(2)}
-                      </td>
-                      <td className="px-4 py-3.5 text-center">
-                        {r.complete ? (
-                          <span className="inline-flex items-center gap-1 font-bold text-xs text-emerald-700 bg-emerald-50 border border-emerald-200/60 px-2.5 py-0.5 rounded-full" title={r.overallDescription}>
-                            <CheckCircle2 className="h-3 w-3" /> {r.overallLevel}
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200/60 px-2.5 py-0.5 rounded-full">
-                            <AlertCircle className="h-3 w-3" /> Incomplete
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={columns.length + (hasStreamData ? 8 : 6)} className="px-6 py-12 text-center text-slate-500">
-                      <div className="flex flex-col items-center justify-center gap-2">
-                        <GraduationCap className="h-8 w-8 text-slate-300" />
-                        <p className="text-sm font-medium">No students or marks have been entered for this selection.</p>
-                      </div>
                     </td>
                   </tr>
+                )) : (
+                  <tr><td colSpan={columns.length + (hasStreamData ? 7 : 5)} className="px-6 py-12 text-center text-slate-500"><div className="flex flex-col items-center justify-center gap-2"><GraduationCap className="h-8 w-8 text-slate-300" /><p className="text-sm font-medium">No students or marks have been entered for this selection.</p></div></td></tr>
                 )}
               </tbody>
             </table>
