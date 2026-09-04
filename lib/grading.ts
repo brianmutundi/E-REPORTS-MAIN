@@ -48,7 +48,7 @@ export type GradingConfig = {
 /**
  * The single authoritative level matcher (spec §10).
  *
- * Closed-open on the low side held                                                 : if a level owns [min, max]
+ * Closed-open on the low side: if a level owns [min, max]
  * this matcher iterates the scale sorted by min ascending and returns the FIRST
  * level whose range contains the percentage, where each level (except the top) is
  * treated as [min, next.min). This makes adjacent-boundary values unambiguous.
@@ -137,41 +137,31 @@ export function getOverallDescription(total: number | null, totalMaximum: number
 export type TotalGradingScale = { referenceMaximum: number; rules: GradeRule[] }
 
 /**
- * Maps a raw TOTAL into the configured totals grading scale. The scale's
- * bands are expressed on a template-level reference maximum (e.g. total out
- * of 700); the assessment's actual maximum (learning areas x 100) is scaled
- * into that same reference frame so a single template works for any number
- * of learning areas:
- *   scaledTotal = total * referenceMaximum / scopeMax
+ * Maps a raw TOTAL using the same authoritative achievement scale selected for
+ * learning areas. `totalScale` remains in the function signature for backward
+ * compatibility with existing callers, but is intentionally ignored.
  *
- * When the school has not configured a totals scale (or the scale is empty),
- * the previous behaviour is preserved: the total is normalised to a
- * percentage and graded with the learning-area scale.
+ * The total is first normalised to a percentage of its actual maximum and then
+ * matched against the active tenant grading configuration. This prevents the
+ * legacy `report_total_grading_levels` table from overriding the selected 4/8
+ * grading mode and ensures TOTAL and learning areas always use one scale.
  */
 export function getTotalLevel(
   total: number | null,
   totalMaximum: number,
-  totalScale: TotalGradingScale | null,
+  _totalScale: TotalGradingScale | null,
   scale: readonly GradeRule[] = GRADING_SCALE,
 ): string {
-  if (total === null || !isAssessed(total) || totalMaximum <= 0) return ''
-  if (!totalScale || totalScale.referenceMaximum <= 0 || totalScale.rules.length === 0) {
-    return getOverallLevel(total, totalMaximum, scale)
-  }
-  return getGrade((total * totalScale.referenceMaximum) / totalMaximum, totalScale.rules)
+  return getOverallLevel(total, totalMaximum, scale)
 }
 
 export function getTotalDescription(
   total: number | null,
   totalMaximum: number,
-  totalScale: TotalGradingScale | null,
+  _totalScale: TotalGradingScale | null,
   scale: readonly GradeRule[] = GRADING_SCALE,
 ): string {
-  if (total === null || !isAssessed(total) || totalMaximum <= 0) return ''
-  if (!totalScale || totalScale.referenceMaximum <= 0 || totalScale.rules.length === 0) {
-    return getOverallDescription(total, totalMaximum, scale)
-  }
-  return getGradeDescription((total * totalScale.referenceMaximum) / totalMaximum, totalScale.rules)
+  return getOverallDescription(total, totalMaximum, scale)
 }
 
 /**
@@ -332,9 +322,27 @@ export function remarkForLevel(overallLevel: string | null | undefined, scale: r
   return bank[Math.min(idx, bank.length - 1)]?.trim() ?? ''
 }
 
-/** The configured overall/totals grading scale, or null when not configured. */
+/**
+ * Legacy total-scale reader retained for compatibility with existing callers.
+ * Once an explicit tenant grading configuration exists, totals MUST use that
+ * configuration, so the legacy `report_total_grading_levels` table is ignored.
+ * This prevents an old template scale from overriding the selected 4/8 mode.
+ *
+ * For tenants without an explicit grading configuration, the legacy data can
+ * still be read by callers that depend on it during migration/compatibility.
+ */
 export async function getTenantTotalGradingScale(tenantId: string): Promise<TotalGradingScale | null> {
   const supabase = await createClient()
+
+  const { data: activeConfig } = await supabase
+    .from('grading_configurations')
+    .select('id')
+    .eq('tenant_id', tenantId)
+    .eq('active', true)
+    .maybeSingle()
+
+  if (activeConfig?.id) return null
+
   const { data: template } = await supabase.from('report_templates').select('id').eq('tenant_id', tenantId).eq('is_default', true).maybeSingle()
   if (!template?.id) return null
   const { data, error } = await supabase
