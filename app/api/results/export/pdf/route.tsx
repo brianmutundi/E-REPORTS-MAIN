@@ -21,7 +21,7 @@ const styles = StyleSheet.create({
   tr: { flexDirection: 'row' },
   th: { backgroundColor: '#eef3f8', fontWeight: 700 },
   cell: { paddingVertical: 4, paddingHorizontal: 3, borderRight: '1 solid #aeb8c7', borderBottom: '1 solid #aeb8c7' },
-  pos: { width: 24, textAlign: 'center' },
+  sn: { width: 24, textAlign: 'center' },
   adm: { width: 62 },
   name: { width: 130 },
   subject: { flex: 1, textAlign: 'center' },
@@ -66,7 +66,7 @@ function BroadsheetPdf({ tenant, examName, term, academicYear, className, result
 
         <View style={styles.table}>
           <View style={[styles.tr, styles.th]} fixed>
-            <Text style={[styles.cell, styles.pos]}>Pos</Text>
+            <Text style={[styles.cell, styles.sn]}>S/N</Text>
             <Text style={[styles.cell, styles.adm]}>Adm No</Text>
             <Text style={[styles.cell, styles.name]}>Student Name</Text>
             {columns.map(c => <Text key={c.subjectId} style={[styles.cell, styles.subject]}>{c.subjectName}</Text>)}
@@ -74,9 +74,9 @@ function BroadsheetPdf({ tenant, examName, term, academicYear, className, result
             <Text style={[styles.cell, styles.total]}>Total</Text>
             <Text style={[styles.cell, styles.level]}>Level</Text>
           </View>
-          {results.map(r => (
+          {results.map((r, index) => (
             <View style={styles.tr} wrap={false} key={r.studentId}>
-              <Text style={[styles.cell, styles.pos]}>{r.complete ? r.position : '—'}</Text>
+              <Text style={[styles.cell, styles.sn]}>{index + 1}</Text>
               <Text style={[styles.cell, styles.adm]}>{r.admissionNo}</Text>
               <Text style={[styles.cell, styles.name]}>{r.fullName}</Text>
               {columns.map(c => {
