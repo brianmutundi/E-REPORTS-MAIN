@@ -10,7 +10,7 @@ export type ReportTemplate = {
   school: { name: boolean; logo: boolean; contact: boolean }
   student: { name: boolean; admissionNo: boolean; className: boolean; stream: boolean }
   examination: { name: boolean; academicYear: boolean; term: boolean }
-  results: { learningArea: boolean; marks: boolean; grade: boolean; gradeDescription: boolean; total: boolean; average: boolean; position: boolean }
+  results: { learningArea: boolean; marks: boolean; grade: boolean; gradeDescription: boolean; total: boolean; average: boolean }
   additional: { teacherComment: boolean; overallComment: boolean; signatureArea: boolean }
   assessmentComponents: AssessmentComponents
 }
@@ -29,7 +29,7 @@ export const defaultReportTemplate: ReportTemplate = {
   school: { name: true, logo: true, contact: false },
   student: { name: true, admissionNo: true, className: true, stream: false },
   examination: { name: true, academicYear: true, term: true },
-  results: { learningArea: true, marks: true, grade: true, gradeDescription: true, total: true, average: true, position: true },
+  results: { learningArea: true, marks: true, grade: true, gradeDescription: true, total: true, average: true },
   additional: { teacherComment: false, overallComment: false, signatureArea: true },
   assessmentComponents: defaultAssessmentComponents,
 }
@@ -40,12 +40,11 @@ function bool(value: unknown, fallback: boolean) {
 
 export function normalizeAssessmentComponents(value: unknown): AssessmentComponents {
   const v = (value && typeof value === 'object' ? value : {}) as Record<string, unknown>
-  const components = {
+  return {
     midTerm: bool(v.midTerm, defaultAssessmentComponents.midTerm),
     endTerm: bool(v.endTerm, defaultAssessmentComponents.endTerm),
     average: bool(v.average, defaultAssessmentComponents.average),
   }
-  return components
 }
 
 export function normalizeReportTemplate(value: unknown): ReportTemplate {
@@ -54,7 +53,7 @@ export function normalizeReportTemplate(value: unknown): ReportTemplate {
     school: { name: bool(v.school?.name, true), logo: bool(v.school?.logo, true), contact: bool(v.school?.contact, false) },
     student: { name: bool(v.student?.name, true), admissionNo: bool(v.student?.admissionNo, true), className: bool(v.student?.className, true), stream: bool(v.student?.stream, false) },
     examination: { name: bool(v.examination?.name, true), academicYear: bool(v.examination?.academicYear, true), term: bool(v.examination?.term, true) },
-    results: { learningArea: bool(v.results?.learningArea, true), marks: bool(v.results?.marks, true), grade: bool(v.results?.grade, true), gradeDescription: bool(v.results?.gradeDescription, true), total: bool(v.results?.total, true), average: bool(v.results?.average, true), position: bool(v.results?.position, true) },
+    results: { learningArea: bool(v.results?.learningArea, true), marks: bool(v.results?.marks, true), grade: bool(v.results?.grade, true), gradeDescription: bool(v.results?.gradeDescription, true), total: bool(v.results?.total, true), average: bool(v.results?.average, true) },
     additional: { teacherComment: bool(v.additional?.teacherComment, false), overallComment: bool(v.additional?.overallComment, false), signatureArea: bool(v.additional?.signatureArea, true) },
     assessmentComponents: normalizeAssessmentComponents(v.assessmentComponents),
   }
@@ -76,7 +75,6 @@ export const templateFields: { section: keyof Omit<ReportTemplate, 'assessmentCo
   { section: 'results', key: 'gradeDescription', label: 'Grade description' },
   { section: 'results', key: 'total', label: 'Total' },
   { section: 'results', key: 'average', label: 'Average / mean' },
-  { section: 'results', key: 'position', label: 'Grade (position)' },
   { section: 'additional', key: 'teacherComment', label: 'Class teacher remark' },
   { section: 'additional', key: 'overallComment', label: 'Head teacher remark' },
   { section: 'additional', key: 'signatureArea', label: 'Signature area' },
