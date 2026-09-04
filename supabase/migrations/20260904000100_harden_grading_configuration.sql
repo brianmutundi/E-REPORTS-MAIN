@@ -110,7 +110,7 @@ begin
       if v_points is null or v_points < 1 or v_points > 8 then
         raise exception '8-level grading requires points from 1 to 8 for level %', v_code;
       end if;
-      if v_broad not in ('EE', 'ME', 'AE', 'BE') then
+      if v_broad is null or v_broad not in ('EE', 'ME', 'AE', 'BE') then
         raise exception '8-level grading requires broad category EE, ME, AE, or BE for level %', v_code;
       end if;
       if v_code not in ('EE1','EE2','ME1','ME2','AE1','AE2','BE1','BE2') then
@@ -120,7 +120,7 @@ begin
       if v_points is not null then
         raise exception '4-level grading does not use points; level % must have NULL points', v_code;
       end if;
-      if v_broad not in ('EE', 'ME', 'AE', 'BE') then
+      if v_broad is null or v_broad not in ('EE', 'ME', 'AE', 'BE') then
         raise exception '4-level grading requires broad category EE, ME, AE, or BE for level %', v_code;
       end if;
       if v_code not in ('EE','ME','AE','BE') then
@@ -150,6 +150,9 @@ begin
     else
       if v_min <= v_previous_min then
         raise exception 'grading level lower bounds must be strictly increasing';
+      end if;
+      if v_min <= v_previous_max then
+        raise exception 'grading scale has overlapping bands around % percent', v_min;
       end if;
       if v_min > v_previous_max + 0.01 then
         raise exception 'grading scale has a gap between % and % percent', v_previous_max, v_min;
