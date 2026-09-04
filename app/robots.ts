@@ -8,12 +8,12 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: 'OAI-SearchBot',
         allow: '/',
-        disallow: ['/dashboard/', '/api/'],
+        disallow: ['/dashboard/', '/super-admin/', '/api/'],
       },
       {
         userAgent: '*',
         allow: '/',
-        disallow: ['/dashboard/', '/api/'],
+        disallow: ['/dashboard/', '/super-admin/', '/api/'],
       },
     ],
     sitemap: `${siteUrl}/sitemap.xml`,
