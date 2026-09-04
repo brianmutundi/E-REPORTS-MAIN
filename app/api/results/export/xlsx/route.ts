@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
   if (!data) return new Response('Broadsheet scope not found', { status: 404 })
 
   const { tenant, exam, className, results, columns } = data
-  const colCount = 3 + columns.length + 3 // AdmNo + Name + subjects + Average + Total + Level
+  const colCount = 3 + columns.length + 3 // S/N + AdmNo + Name + subjects + Average + Total + Level
 
   const sheet = XLSX.utils.aoa_to_sheet([])
   const setCell = (r: number, c: number, value: string | number, style?: CellStyle) => {
@@ -64,16 +64,16 @@ export async function GET(request: NextRequest) {
   row++ // spacer
   const headerRow = row
 
-  ;['Pos', 'Adm No', 'Student Name', ...columns.map(c => c.subjectName), 'Average', 'Total', 'Level'].forEach((value, i) => {
+  ;['S/N', 'Adm No', 'Student Name', ...columns.map(c => c.subjectName), 'Average', 'Total', 'Level'].forEach((value, i) => {
     setCell(row, i, value, { font: { bold: true }, fill: { fgColor: { rgb: 'EEF2F7' } }, border: { top: BORDER_MEDIUM, bottom: BORDER_MEDIUM } })
   })
   row++
 
   const center: CellAlignment = { horizontal: 'center' }
-  results.forEach(r => {
+  results.forEach((r, index) => {
     const scores = columns.map(c => r.subjects.find(s => s.subjectId === c.subjectId)?.score ?? '')
     const cells: (string | number)[] = [
-      r.complete ? r.position : '',
+      index + 1,
       r.admissionNo,
       r.fullName,
       ...scores,
