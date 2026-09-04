@@ -1,5 +1,5 @@
 import { getDashboardSession } from '@/lib/supabase/session'
-import { computeTotal, computeTotalMaximum, getGrade, getTotalLevel, getTotalDescription, rankCompetitive, getTenantGradingScale, getTenantTotalGradingScale, type GradeRule } from './grading'
+import { computeTotal, computeTotalMaximum, getGrade, getTotalLevel, getTotalDescription, getTenantGradingScale, getTenantTotalGradingScale, type GradeRule } from './grading'
 import { getScopeSubjects } from './scope'
 import type { AssessmentComponents } from './report-template'
 
@@ -12,8 +12,6 @@ export type ResultRow = {
   total: number
   average: number
   grade: string
-  position: number
-  streamPosition: number | null
   streamId: string | null
   streamName: string | null
   complete: boolean
@@ -40,8 +38,6 @@ export type AssessmentReportRow = {
   subjects: AssessmentResultSubject[]
   total: number | null
   average: number | null
-  position: number | null
-  streamPosition: number | null
   streamId: string | null
   streamName: string | null
   complete: boolean
@@ -92,12 +88,9 @@ export async function getExamResults(examId: string, classId: string, streamId?:
     const total = computeTotal(subjects.map(s => s.score))
     const average = subjects.length ? total / subjects.length : 0
     const complete = expectedSubjects > 0 && subjects.length >= expectedSubjects
-    return { studentId: student.id, admissionNo: student.admission_no, fullName: student.full_name, streamId: student.stream_id ?? null, streamName: student.stream_id ? (streamNames.get(student.stream_id) ?? null) : null, total, average, grade: complete ? getGrade(average, scale) : '', overallLevel: getTotalLevel(total, totalMaximum, totalScale, scale), overallDescription: getTotalDescription(total, totalMaximum, totalScale, scale), position: 0, streamPosition: null, complete, expectedSubjects, subjects }
+    return { studentId: student.id, admissionNo: student.admission_no, fullName: student.full_name, streamId: student.stream_id ?? null, streamName: student.stream_id ? (streamNames.get(student.stream_id) ?? null) : null, total, average, grade: complete ? getGrade(average, scale) : '', overallLevel: getTotalLevel(total, totalMaximum, totalScale, scale), overallDescription: getTotalDescription(total, totalMaximum, totalScale, scale), complete, expectedSubjects, subjects }
   })
-  assignStreamPositions(rows.filter(r => r.streamId))
-  const ranked = rows.filter(row => row.complete).sort((a, b) => b.total - a.total || b.average - a.average || a.fullName.localeCompare(b.fullName))
-  assignCompetitivePositions(ranked, 'total')
-  return { results: [...ranked, ...rows.filter(row => !row.complete).sort((a, b) => a.fullName.localeCompare(b.fullName))], columns }
+  return { results: rows.sort((a, b) => a.fullName.localeCompare(b.fullName)), columns }
 }
 
 export type BroadsheetExportData = {
@@ -106,45 +99,6 @@ export type BroadsheetExportData = {
   className: string
   results: ResultRow[]
   columns: ResultColumn[]
-}
-
-/**
- * Competitive (standard competition) grade position over complete rows only.
- * Tied totals share a position; the next position skips the tied count.
- */
-function assignCompetitivePositions(rows: ResultRow[], scoreKey: 'total') {
-  const positions = rankCompetitive(rows.filter(r => r.complete).map(r => ({ id: r.studentId, score: r[scoreKey] })))
-  rows.forEach(row => { row.position = positions.get(row.studentId) ?? 0 })
-}
-
-/** Stream Position ranks complete learners within their own stream using TOTAL. */
-function assignStreamPositions(rows: ResultRow[]) {
-  const groups = new Map<string, ResultRow[]>()
-  for (const row of rows) {
-    if (!row.streamId) continue
-    const list = groups.get(row.streamId) ?? []
-    list.push(row)
-    groups.set(row.streamId, list)
-  }
-  for (const [streamId, group] of groups) {
-    const positions = rankCompetitive(group.filter(r => r.complete).map(r => ({ id: r.studentId, score: r.total })))
-    for (const row of group) row.streamPosition = positions.get(row.studentId) ?? null
-  }
-}
-
-/** Report-row variant of stream ranking using the row's sorted total. */
-function assignStreamPositionsByTotal(rows: AssessmentReportRow[]) {
-  const groups = new Map<string, AssessmentReportRow[]>()
-  for (const row of rows) {
-    if (!row.streamId) continue
-    const list = groups.get(row.streamId) ?? []
-    list.push(row)
-    groups.set(row.streamId, list)
-  }
-  for (const [, group] of groups) {
-    const positions = rankCompetitive(group.filter(r => r.complete && r.total !== null).map(r => ({ id: r.studentId, score: r.total ?? 0 })))
-    for (const row of group) row.streamPosition = positions.get(row.studentId) ?? null
-  }
 }
 
 /**
@@ -206,16 +160,14 @@ export async function getConfiguredAssessmentResults(
     if (ids.length) {
       const { data: classLinks } = await supabase.from('exam_classes').select('exam_id').eq('class_id', classId).in('exam_id', ids)
       const allowed = new Set((classLinks ?? []).map(x => x.exam_id))
-      if (needsMid) midExamId = (candidates ?? []).find(e => e.assessment_component === 'mid_term' && allowed.has(e.id))?.id ?? null
-      if (needsEnd) endExamId = (candidates ?? []).find(e => e.assessment_component === 'end_term' && allowed.has(e.id))?.id ?? null
+      if (needsMid) midExamId = candidates.find(e => e.assessment_component === 'mid_term' && allowed.has(e.id))?.id ?? null
+      if (needsEnd) endExamId = candidates.find(e => e.assessment_component === 'end_term' && allowed.has(e.id))?.id ?? null
     }
   }
 
   if (components.midTerm && !midExamId) return { rows: [], selectedExam, midExamId, endExamId, error: 'A Mid Term examination assigned to this class could not be found for the selected term and academic year.' }
   if (components.endTerm && !endExamId) return { rows: [], selectedExam, midExamId, endExamId, error: 'An End Term examination assigned to this class could not be found for the selected term and academic year.' }
 
-  // Average-only reports preserve the application's existing behaviour: the
-  // selected examination remains the source of marks and its mean is shown.
   const averageSourceExamId = components.average && !components.midTerm && !components.endTerm ? selectedExam.id : null
   const examIds = [midExamId, endExamId, averageSourceExamId].filter((id): id is string => Boolean(id))
   const studentQuery = supabase
@@ -280,18 +232,8 @@ export async function getConfiguredAssessmentResults(
     const overallAverage = averageValues.length === subjects.length && subjects.length ? averageValues.reduce((a, b) => a + b, 0) / averageValues.length : null
     const total = components.endTerm && subjects.every(s => s.endTerm !== null) ? computeTotal(subjects.map(s => s.endTerm)) : components.midTerm && subjects.every(s => s.midTerm !== null) ? computeTotal(subjects.map(s => s.midTerm)) : components.average ? (overallAverage !== null && subjects.length ? overallAverage * subjects.length : null) : null
     const streamId = student.stream_id ?? null
-    return { studentId: student.id, admissionNo: student.admission_no, fullName: student.full_name, streamId, streamName: streamId ? (streamNames.get(streamId) ?? null) : null, streamPosition: null, subjects, total, average: overallAverage, position: null, complete, expectedSubjects, overallLevel: getTotalLevel(total, totalMaximum, totalScale, scale), overallDescription: getTotalDescription(total, totalMaximum, totalScale, scale) }
+    return { studentId: student.id, admissionNo: student.admission_no, fullName: student.full_name, streamId, streamName: streamId ? (streamNames.get(streamId) ?? null) : null, subjects, total, average: overallAverage, complete, expectedSubjects, overallLevel: getTotalLevel(total, totalMaximum, totalScale, scale), overallDescription: getTotalDescription(total, totalMaximum, totalScale, scale) }
   })
 
-  assignStreamPositionsByTotal(rows)
-
-  const ranked = rows.filter(r => r.complete && (r.total !== null || r.average !== null)).sort((a, b) => {
-    const aScore = a.total ?? a.average ?? 0
-    const bScore = b.total ?? b.average ?? 0
-    return bScore - aScore || ((b.average ?? 0) - (a.average ?? 0)) || a.fullName.localeCompare(b.fullName)
-  })
-
-  const gradePositions = rankCompetitive(ranked.map(r => ({ id: r.studentId, score: r.total ?? r.average ?? 0 })))
-  ranked.forEach(row => { row.position = gradePositions.get(row.studentId) ?? null })
-  return { rows: [...ranked, ...rows.filter(r => !r.complete).sort((a, b) => a.fullName.localeCompare(b.fullName))], selectedExam, midExamId, endExamId, error: null }
+  return { rows: rows.sort((a, b) => a.fullName.localeCompare(b.fullName)), selectedExam, midExamId, endExamId, error: null }
 }
