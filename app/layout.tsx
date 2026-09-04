@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import './globals.css'
-import InstallAppBanner from '@/components/InstallAppBanner'
+import InstallAppBannerLoader from '@/components/InstallAppBannerLoader'
 
 export const metadata: Metadata = {
   title: 'E-REPORTS',
@@ -23,7 +23,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="en">
       <body>
         {children}
-        <InstallAppBanner />
+        <InstallAppBannerLoader />
       </body>
     </html>
   )
