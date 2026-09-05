@@ -30,6 +30,13 @@ export type ReportTenant = { name: string; logo_url: string | null; address: str
 export async function getReportTenant(supabase: SupabaseClient, tenantId: string): Promise<ReportTenant | null> {
   if (!tenantId) return null
 
+  // Diagnostic trail across every branch below, so a null return can always be
+  // explained afterwards instead of collapsing into one generic message. Each
+  // entry records which lookup ran and exactly why it did not return a row:
+  // a thrown/config error, a Postgres/PostgREST error, or a clean zero-row
+  // result (no error, no data) which is a data-state fact, not a failure.
+  const trail: Array<{ step: string; outcome: string; detail?: string }> = []
+
   // This function is called only from server-side report/dashboard code. The
   // tenantId comes from the authenticated dashboard session, not the URL.
   // Querying that exact tenant with the service-role client avoids a false
@@ -43,9 +50,10 @@ export async function getReportTenant(supabase: SupabaseClient, tenantId: string
       .eq('id', tenantId)
       .maybeSingle()
     if (!error && data) return data as ReportTenant
-    if (error) console.error('Assessment report tenant lookup failed', { tenantId, error: error.message })
+    if (error) trail.push({ step: 'admin_client', outcome: 'query_error', detail: error.message })
+    else trail.push({ step: 'admin_client', outcome: 'zero_rows' })
   } catch (error) {
-    console.error('Assessment report admin tenant lookup unavailable', { tenantId, error: error instanceof Error ? error.message : 'Unknown error' })
+    trail.push({ step: 'admin_client', outcome: 'unavailable', detail: error instanceof Error ? error.message : 'Unknown error' })
   }
 
   // RLS-protected fallback for environments where the service-role key is not
@@ -56,6 +64,11 @@ export async function getReportTenant(supabase: SupabaseClient, tenantId: string
     .eq('id', tenantId)
     .maybeSingle()
   if (!primary.error && primary.data) return primary.data as ReportTenant
+  trail.push(
+    primary.error
+      ? { step: 'rls_client_full_select', outcome: 'query_error', detail: primary.error.message }
+      : { step: 'rls_client_full_select', outcome: 'zero_rows' },
+  )
 
   if (primary.error) {
     const basic = await supabase
@@ -64,11 +77,19 @@ export async function getReportTenant(supabase: SupabaseClient, tenantId: string
       .eq('id', tenantId)
       .maybeSingle()
     if (!basic.error && basic.data) return { ...basic.data, address: null } as ReportTenant
-    console.error('Assessment report school profile lookup failed', {
-      tenantId,
-      primaryError: primary.error.message,
-      basicError: basic.error?.message ?? null,
-    })
+    trail.push(
+      basic.error
+        ? { step: 'rls_client_basic_select', outcome: 'query_error', detail: basic.error.message }
+        : { step: 'rls_client_basic_select', outcome: 'zero_rows' },
+    )
   }
+
+  // One line, always logged when every lookup path has been exhausted, naming
+  // the tenantId and exactly what each branch returned. "zero_rows" on both
+  // the service-role and RLS-scoped queries (no query_error anywhere) means
+  // there is genuinely no tenants row for this id — a data problem, not RLS
+  // or config. A query_error/unavailable entry points at RLS or environment
+  // configuration instead.
+  console.error('Assessment report tenant lookup exhausted all paths', { tenantId, trail })
   return null
 }
