@@ -1,0 +1,35 @@
+name: Fix report settings dates
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore preview dates without settings copy
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('app/dashboard/reports/page.tsx')
+          text = path.read_text()
+
+          text = text.replace("import { parseTermReference, getTermRowDates } from '@/lib/terms'", "import { parseTermReference, getTermRowDates, getEffectiveTermDates, NEXT_TERM_OPENING_PLACEHOLDER } from '@/lib/terms'")
+          text = text.replace("  const [termRowDates] = await Promise.all([\n    currentTermRef ? getTermRowDates(supabase, tenantId, currentTermRef) : Promise.resolve({ opening_date: null, closing_date: null }),\n  ])\n  const openingDate = termRowDates.opening_date\n  const closingDate = termRowDates.closing_date",
+            "  const [termRowDates, effectiveDates] = await Promise.all([\n    currentTermRef ? getTermRowDates(supabase, tenantId, currentTermRef) : Promise.resolve({ opening_date: null, closing_date: null }),\n    getEffectiveTermDates(supabase, tenantId, currentTermRef),\n  ])\n  const openingDate = termRowDates.opening_date\n  const closingDate = termRowDates.closing_date\n  const currentClosingDate = effectiveDates.closingDate\n  const nextOpeningDate = effectiveDates.openingDate ?? NEXT_TERM_OPENING_PLACEHOLDER")
+
+          path.write_text(text)
+          PY
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app/dashboard/reports/page.tsx
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'fix: restore report preview term dates'
+          git push
