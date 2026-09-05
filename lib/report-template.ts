@@ -26,27 +26,37 @@ export const templateFields: { section: keyof Omit<ReportTemplate, 'assessmentCo
 ]
 export type ReportTenant = { name: string; logo_url: string | null; address: string | null }
 
-/**
- * Resolve the authenticated school's tenant row without ever weakening tenant
- * isolation. The normal path uses the caller's RLS-protected client. The
- * service-role client is only a server-side fallback for environments where
- * the authenticated query cannot read the tenant row; it is still constrained
- * to the exact tenantId supplied by the authenticated report session.
- */
+/** Resolve only the already-authenticated tenant. The caller must obtain tenantId from getDashboardSession. */
 export async function getReportTenant(supabase: SupabaseClient, tenantId: string): Promise<ReportTenant | null> {
   if (!tenantId) return null
 
+  // This function is called only from server-side report/dashboard code. The
+  // tenantId comes from the authenticated dashboard session, not the URL.
+  // Querying that exact tenant with the service-role client avoids a false
+  // "profile missing" result when tenant RLS/PostgREST visibility is the issue,
+  // while still preserving tenant isolation at the application boundary.
+  try {
+    const admin = createAdminClient()
+    const { data, error } = await admin
+      .from('tenants')
+      .select('name,logo_url,address')
+      .eq('id', tenantId)
+      .maybeSingle()
+    if (!error && data) return data as ReportTenant
+    if (error) console.error('Assessment report tenant lookup failed', { tenantId, error: error.message })
+  } catch (error) {
+    console.error('Assessment report admin tenant lookup unavailable', { tenantId, error: error instanceof Error ? error.message : 'Unknown error' })
+  }
+
+  // RLS-protected fallback for environments where the service-role key is not
+  // available. It is still constrained to the same authenticated tenantId.
   const primary = await supabase
     .from('tenants')
     .select('name,logo_url,address')
     .eq('id', tenantId)
     .maybeSingle()
-
   if (!primary.error && primary.data) return primary.data as ReportTenant
 
-  // Keep compatibility with databases where the address column is not yet
-  // present in the API schema cache. Never turn a missing optional field into
-  // a missing school profile.
   if (primary.error) {
     const basic = await supabase
       .from('tenants')
@@ -54,37 +64,11 @@ export async function getReportTenant(supabase: SupabaseClient, tenantId: string
       .eq('id', tenantId)
       .maybeSingle()
     if (!basic.error && basic.data) return { ...basic.data, address: null } as ReportTenant
-
     console.error('Assessment report school profile lookup failed', {
       tenantId,
       primaryError: primary.error.message,
       basicError: basic.error?.message ?? null,
     })
   }
-
-  // Server-only fallback. This never changes the requested tenant ID and does
-  // not bypass the ownership checks already performed by the report route.
-  try {
-    const admin = createAdminClient()
-    const adminResult = await admin
-      .from('tenants')
-      .select('name,logo_url,address')
-      .eq('id', tenantId)
-      .maybeSingle()
-    if (!adminResult.error && adminResult.data) return adminResult.data as ReportTenant
-
-    if (adminResult.error) {
-      console.error('Assessment report admin school profile lookup failed', {
-        tenantId,
-        error: adminResult.error.message,
-      })
-    }
-  } catch (error) {
-    console.error('Assessment report admin school profile client unavailable', {
-      tenantId,
-      error: error instanceof Error ? error.message : 'Unknown error',
-    })
-  }
-
   return null
 }
