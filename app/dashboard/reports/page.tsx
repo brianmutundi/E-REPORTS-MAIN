@@ -109,7 +109,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   }
 
   return <main className="main" style={{ maxWidth: 1120, margin: '0 auto' }}>
-    <div className="top no-print"><div><div className="eyebrow">Assessment reports</div><h1 className="title">Student Assessment Reports</h1><p className="muted">Choose the report form, set the term dates for this school, and select an examination and grade to view the report form.</p></div></div>
+    <div className="top no-print"><div><div className="eyebrow">Assessment reports</div><h1 className="title">Student Assessment Reports</h1></div></div>
 
     {params.error && (() => { const idx = params.error.indexOf('|'); return idx > -1 ? <div className="notice error no-print" style={{ marginTop: 16 }}><span className="font-semibold">{params.error.slice(0, idx)}</span><span className="block text-xs opacity-80 mt-0.5">{params.error.slice(idx + 1)}</span></div> : <div className="notice error no-print" style={{ marginTop: 16 }}>{params.error}</div> })()}
     {params.saved && <SuccessToast message="Report settings saved" />}
