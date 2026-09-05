@@ -6,13 +6,12 @@ export type AssessmentComponents = {
   average: boolean
 }
 
-export const REPORT_TEMPLATE_KEYS = ['standard', 'cbc_4level', 'html_custom'] as const
+export const REPORT_TEMPLATE_KEYS = ['standard', 'cbc_4level'] as const
 export type ReportTemplateKey = (typeof REPORT_TEMPLATE_KEYS)[number]
 
 export const REPORT_TEMPLATE_LABELS: Record<ReportTemplateKey, string> = {
   standard: 'Standard Assessment Report',
   cbc_4level: 'CBC 4-Level Assessment Report',
-  html_custom: 'Custom HTML — CBC Report (gemini-code)',
 }
 
 export function validTemplateKey(value: unknown): value is ReportTemplateKey {
@@ -29,10 +28,6 @@ export type ReportTemplate = {
 }
 
 export const defaultAssessmentComponents: AssessmentComponents = {
-  // Backwards-compatible with the existing single-examination report: the
-  // selected examination is treated as the end-term/current assessment and
-  // the existing mean is still available until the administrator chooses a
-  // different configuration.
   midTerm: false,
   endTerm: true,
   average: true,
@@ -95,11 +90,6 @@ export const templateFields: { section: keyof Omit<ReportTemplate, 'assessmentCo
 
 export type ReportTenant = { name: string; code: string | null; logo_url: string | null; address: string | null }
 
-/**
- * Loads school details for report forms. Reads the optional `address`
- * column and tolerates its absence so the app still works before the
- * add-tenant-address migration is applied to a project.
- */
 export async function getReportTenant(supabase: SupabaseClient, tenantId: string): Promise<ReportTenant | null> {
   const { data, error } = await supabase.from('tenants').select('name,code,logo_url,address').eq('id', tenantId).maybeSingle()
   if (!error && data) return data as ReportTenant
