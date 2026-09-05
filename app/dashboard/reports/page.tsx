@@ -11,7 +11,7 @@ import SuccessToast from '@/components/SuccessToast'
 import SubmitButton from '@/components/SubmitButton'
 import SmsSendQueue from '@/components/reports/SmsSendQueue'
 import { saveReportSettings } from './actions'
-import { parseTermReference, getTermRowDates, getEffectiveTermDates, NEXT_TERM_OPENING_PLACEHOLDER } from '@/lib/terms'
+import { parseTermReference, getEffectiveTermDates, NEXT_TERM_OPENING_PLACEHOLDER } from '@/lib/terms'
 
 export default async function ReportsPage({ searchParams }: { searchParams: Promise<{ exam?: string; class?: string; student?: string; stream?: string; saved?: string; error?: string }> }) {
   const params = await searchParams
@@ -42,15 +42,9 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const hasSelection = Boolean(params.exam && params.class && gradeValid)
   const termFallbackExam = hasSelection ? (exams?.find(e => e.id === params.exam) ?? null) ?? (exams?.at(-1) ?? null) : (exams?.at(-1) ?? null)
   const currentTermRef = parseTermReference({ term: termFallbackExam?.term ?? null, academicYear: termFallbackExam?.academic_year ?? null })
-  const [termRowDates, effectiveDates] = await Promise.all([
-    currentTermRef ? getTermRowDates(supabase, tenantId, currentTermRef) : Promise.resolve({ opening_date: null, closing_date: null }),
-    getEffectiveTermDates(supabase, tenantId, currentTermRef),
-  ])
-  const openingDate = termRowDates.opening_date
-  const closingDate = termRowDates.closing_date
-  const storedDatesValid = !openingDate || !closingDate || openingDate < closingDate
-  const formOpeningDate = storedDatesValid ? openingDate : null
-  const formClosingDate = storedDatesValid ? closingDate : null
+  const effectiveDates = await getEffectiveTermDates(supabase, tenantId, currentTermRef)
+  const openingDate = effectiveDates.openingDate
+  const closingDate = effectiveDates.closingDate
   const currentClosingDate = effectiveDates.closingDate
   const nextOpeningDate = effectiveDates.openingDate ?? NEXT_TERM_OPENING_PLACEHOLDER
   const [configured, remarkBanks] = hasSelection
@@ -115,8 +109,8 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
         <input type="hidden" name="stream" value={params.stream ?? ''} />
         <div className="form-grid">
           <label className="field-label">Report template<select name="template_key" defaultValue={templateKey}>{REPORT_TEMPLATE_KEYS.map(key => <option key={key} value={key}>{REPORT_TEMPLATE_LABELS[key]}</option>)}</select></label>
-          <label className="field-label">Opening date<input type="date" name="opening_date" defaultValue={formOpeningDate ?? ''} /></label>
-          <label className="field-label">Closing date<input type="date" name="closing_date" defaultValue={formClosingDate ?? ''} /></label>
+          <label className="field-label">Opening date<input type="date" name="opening_date" defaultValue={openingDate ?? ''} /></label>
+          <label className="field-label">Closing date<input type="date" name="closing_date" defaultValue={closingDate ?? ''} /></label>
         </div>
         <div className="actions-inline" style={{ marginTop: 14 }}><SubmitButton>Save report settings</SubmitButton></div>
       </form>
@@ -171,33 +165,27 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
           <div className="grading-key" style={{ width: '100%', margin: '12px 0', border: '1px solid #333', fontFamily: 'Arial, sans-serif', fontSize: gradingScale.length > 4 ? 9 : 10 }}>
             <div style={{ backgroundColor: '#e6e6e6', textAlign: 'center', fontWeight: 'bold', padding: 3, borderBottom: '1px solid #333', fontSize: gradingScale.length > 4 ? 10 : 11 }}>PERFORMANCE LEVEL KEY ({gradingScale.length}-LEVEL SCALE)</div>
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'center', tableLayout: 'fixed' }}>
-              <thead><tr style={{ backgroundColor: '#f9f9f9', borderBottom: '1px solid #333' }}>{gradingScale.map(r => <th key={r.grade} style={{ borderRight: '1px solid #333', padding: 4, fontWeight: 'bold' }}>{r.grade}</th>)}</tr></thead>
-              <tbody>
-                <tr style={{ borderBottom: '1px solid #333' }}>{gradingScale.map(r => <td key={r.grade} style={{ borderRight: '1px solid #333', padding: 4, fontSize: gradingScale.length > 4 ? 8 : 9, fontWeight: 'bold' }}>{r.description.toUpperCase()}</td>)}</tr>
-                <tr>{gradingScale.map(r => { const min = Math.ceil(r.min); const max = Math.floor(r.max); const range = min === max ? `${min}` : `${min} - ${max}`; return <td key={r.grade} style={{ borderRight: '1px solid #333', padding: 4, fontSize: gradingScale.length > 4 ? 8 : undefined }}>{range}</td> })}</tr>
-              </tbody>
+              <thead><tr style={{ backgroundColor: '#f9f9f9', borderBottom: '1px solid #333' }}>{gradingScale.map(r => <th key={r.grade} style={{ borderRight: '1px solid #333', padding: 3 }}>{r.grade}</th>)}</tr></thead>
+              <tbody><tr>{gradingScale.map(r => <td key={r.grade} style={{ borderRight: '1px solid #333', padding: 3 }}>{r.min}–{r.max}</td>)}</tr></tbody>
             </table>
           </div>
         )}
-        {!selected.complete && <div className="notice error">Incomplete result — required assessment marks are missing. Missing marks are not treated as zero.</div>}
-        <table className="report-table">
-          <thead><tr>{template.results.learningArea && <th>Learning Area</th>}{template.assessmentComponents.midTerm && <th>{scoreHeader('Mid Term')}</th>}{template.assessmentComponents.endTerm && <th>{scoreHeader('End Term')}</th>}{template.assessmentComponents.average && <th>{scoreHeader('Score')}</th>}{template.results.grade && <th>Level</th>}{template.results.gradeDescription && <th>Description</th>}</tr></thead>
-          <tbody>{selected.subjects.map(s => <tr key={s.subjectId}>{template.results.learningArea && <td>{s.subjectName}</td>}{template.assessmentComponents.midTerm && <td>{s.midTerm === null ? 'ABS' : s.midTerm.toFixed(2)}</td>}{template.assessmentComponents.endTerm && <td>{s.endTerm === null ? 'ABS' : s.endTerm.toFixed(2)}</td>}{template.assessmentComponents.average && <td>{s.average === null ? 'ABS' : s.average.toFixed(2)}</td>}{template.results.grade && <td>{s.grade || '—'}</td>}{template.results.gradeDescription && <td>{s.gradeDescription || '—'}</td>}</tr>)}</tbody>
-          {(template.results.total || template.results.average || template.results.grade) && (() => {
-            const span = Math.max(1, (template.assessmentComponents.midTerm ? 1 : 0) + (template.assessmentComponents.endTerm ? 1 : 0) + (template.assessmentComponents.average ? 1 : 0) + (template.results.grade ? 1 : 0) + (template.results.gradeDescription ? 1 : 0))
-            return <tfoot>{template.results.total && (template.assessmentComponents.midTerm || template.assessmentComponents.endTerm || template.assessmentComponents.average) && <tr><th>Total</th><th colSpan={span}>{selected.total === null ? '—' : `${selected.total}`}</th></tr>}{template.results.average && template.assessmentComponents.average && <tr><th>Average</th><th colSpan={span}>{selected.average === null ? '—' : selected.average.toFixed(2)}</th></tr>}{template.results.grade && selected.overallLevel && <tr><th>Overall Performance Level</th><th colSpan={span}>{selected.overallLevel}{selected.overallDescription ? ` — ${selected.overallDescription}` : ''}</th></tr>}</tfoot>
-          })()}
-        </table>
-        <div className="financial-information" aria-label="Financial Information">
-          <div className="financial-information-title">Financial Information</div>
-          <div className="financial-information-row"><span>Fee Balance</span><span className="financial-line">________________</span></div>
-          <div className="financial-information-row"><span>Next Term Fee</span><span className="financial-line">________________</span></div>
+        <div className="report-table-wrap">
+          <table className="report-table">
+            <thead><tr><th>Learning Area</th>{scoreLabels.map(label => <th key={label}>{scoreHeader(label)}</th>)}{template.results.grade && <th>Level</th>}</tr></thead>
+            <tbody>{selected.subjects.map(s => <tr key={s.subjectId}><td>{s.subjectName}</td>{template.assessmentComponents.midTerm && <td>{s.midTerm != null ? s.midTerm.toFixed(1) : 'ABS'}</td>}{template.assessmentComponents.endTerm && <td>{s.endTerm != null ? s.endTerm.toFixed(1) : 'ABS'}</td>}{template.assessmentComponents.average && <td><strong>{s.average != null ? s.average.toFixed(1) : 'ABS'}</strong></td>}{template.results.grade && <td>{s.grade ?? '—'}</td>}</tr>)}
+              <tr><td><strong>Total</strong></td>{template.assessmentComponents.midTerm && <td><strong>{selected.midTermTotal != null ? selected.midTermTotal.toFixed(1) : '—'}</strong></td>}{template.assessmentComponents.endTerm && <td><strong>{selected.endTermTotal != null ? selected.endTermTotal.toFixed(1) : '—'}</strong></td>}{template.assessmentComponents.average && <td><strong>{selected.averageTotal != null ? selected.averageTotal.toFixed(1) : '—'}</strong></td>}{template.results.grade && <td><strong>{selected.overallLevel ?? '—'}</strong></td>}</tr>
+            </tbody>
+          </table>
         </div>
-        {(currentClosingDate || nextOpeningDate) ? <div className="report-term-line">School Closes on <strong>{currentClosingDate ?? '____________'}</strong> and opens on <strong>{nextOpeningDate}</strong></div> : null}
-        {template.additional.teacherComment && <div className="preview-note report-remark"><b>Remark (Grade Class Teacher)</b><p className="remark-text">{remarkForLevel(selected.overallLevel, gradingScale, teacherRemarks) || '____________________________'}</p></div>}
-        {template.additional.overallComment && <div className="preview-note report-remark"><b>Remark (Principal)</b><p className="remark-text">{remarkForLevel(selected.overallLevel, gradingScale, principalRemarks) || '____________________________'}</p></div>}
-        {template.additional.signatureArea && <div className="signature-block"><div className="signature-row"><span>Grade Class Teacher&apos;s Name: {classTeacherName || '________________'}</span><span>Sign: ____________</span><span>Date: ____________</span></div><div className="signature-row"><span>Principal&apos;s Name: {classPrincipalName || '________________'}</span><span>Sign: ____________</span><span>Date: ____________</span></div></div>}
-        <div className="report-actions no-print"><PrintButton href={`/api/reports/pdf?exam=${params.exam}&class=${params.class}${params.stream ? `&stream=${params.stream}` : ''}&student=${selected.studentId}`} /></div>
+        {template.results.overall && <div className="overall"><strong>Overall: {selected.overallLevel ?? '—'}</strong>{selected.overallDescription ? ` — ${selected.overallDescription}` : ''}</div>}
+        <div className="remarks-grid">
+          <div><h3>Grade Class Teacher’s Remarks</h3><p>{selected.teacherRemark ?? teacherRemarks[0] ?? '—'}</p><div className="signature-line">Grade Class Teacher: {classTeacherName ?? '________________'}</div></div>
+          <div><h3>Principal’s Remarks</h3><p>{selected.principalRemark ?? principalRemarks[0] ?? '—'}</p><div className="signature-line">Principal: {classPrincipalName ?? '________________'}</div></div>
+        </div>
+        <div className="term-dates"><div>School closes: <strong>{currentClosingDate ?? 'To be announced'}</strong></div><div>School opens: <strong>{nextOpeningDate}</strong></div></div>
+        {template.results.graph && <div className="report-chart">Performance chart</div>}
+        <div className="actions no-print"><PrintButton href={`/api/reports/pdf?exam=${params.exam}&class=${params.class}&student=${selected.studentId}${params.stream ? `&stream=${params.stream}` : ''}`} label="Download PDF" /></div>
       </section>
     )}
   </main>
