@@ -12,6 +12,40 @@ export type SmsItem = {
   href: string
 }
 
+function buildParentMessage(item: SmsItem) {
+  const lines = item.message.split('\n').map(line => line.trim()).filter(Boolean)
+  const overallIndex = lines.findIndex(line => /^Overall:/i.test(line))
+  const header = lines[0] ?? ''
+  const subjectLines = overallIndex >= 0 ? lines.slice(1, overallIndex) : lines.slice(1)
+  const overall = overallIndex >= 0 ? lines[overallIndex] : ''
+  const isMidTerm = /mid[ -]?term/i.test(header)
+  const periodLabel = isMidTerm ? 'mid-term' : 'assessment'
+  const guidance = overall
+    ? `Please encourage your child to maintain their strengths while continuing to work on areas that require improvement.`
+    : `Please continue supporting your child’s learning and progress.`
+
+  return [
+    'Dear Parent/Guardian,',
+    '',
+    header,
+    '',
+    `Learner’s Name: ${item.fullName}`,
+    `Admission No.: ${item.admissionNo}`,
+    '',
+    `Your child’s ${periodLabel} assessment results are as follows:`,
+    ...subjectLines,
+    '',
+    overall,
+    '',
+    guidance,
+    '',
+    'Thank you for your continued support and partnership in your child’s learning.',
+    '',
+    'T SCHOOL',
+    'Management',
+  ].filter((line, index, all) => line !== '' || (index > 0 && index < all.length - 1)).join('\n')
+}
+
 export default function SmsSendQueue({ items }: { items: SmsItem[] }) {
   const [sent, setSent] = useState<Set<string>>(new Set())
   const [expanded, setExpanded] = useState<string | null>(null)
@@ -19,7 +53,10 @@ export default function SmsSendQueue({ items }: { items: SmsItem[] }) {
   if (!items.length) return null
 
   const handleSend = (item: SmsItem) => {
-    window.open(item.href, '_blank')
+    const message = buildParentMessage(item)
+    const normalizedPhone = item.phone.replace(/[^0-9+]/g, '')
+    const href = `sms:${normalizedPhone}?body=${encodeURIComponent(message)}`
+    window.open(href, '_blank')
     setSent(prev => new Set(prev).add(item.studentId))
   }
 
@@ -37,6 +74,7 @@ export default function SmsSendQueue({ items }: { items: SmsItem[] }) {
         {items.map(item => {
           const isSent = sent.has(item.studentId)
           const isOpen = expanded === item.studentId
+          const message = buildParentMessage(item)
           return (
             <div key={item.studentId} className="px-4 py-3">
               <div className="flex items-center justify-between gap-3">
@@ -76,7 +114,7 @@ export default function SmsSendQueue({ items }: { items: SmsItem[] }) {
               </div>
               {isOpen && (
                 <pre className="mt-2 whitespace-pre-wrap break-words text-xs leading-relaxed text-slate-600 bg-slate-50 rounded-lg p-3 border border-slate-200 max-h-48 overflow-y-auto font-sans">
-                  {item.message}
+                  {message}
                 </pre>
               )}
             </div>
