@@ -7,22 +7,7 @@ import { friendlyDbRedirect } from '@/lib/db-errors'
 import { defaultReportTemplate, validTemplateKey } from '@/lib/report-template'
 import { parseTermReference, nextTermReference, termLabel } from '@/lib/terms'
 
-/**
- * Saves the report-form preferences for the school's default report template:
- * the chosen template form, the optional custom HTML source (Handlebars) and
- * the term calendar dates for the term of the currently selected examination.
- *
- * Term dates live in `terms` (per tenant, keyed by academic year + term
- * label). The report always shows the NEXT term's opening date against the
- * current term's closing date, so this save enforces:
- *   - opening must be before closing for the same term;
- *   - the next term's opening (if already configured) must be later than this
- *     term's closing. A missing next-term opening renders "To be announced".
- *
- * report_template_configs retains its legacy opening/closing columns for
- * backward compatibility, so older code paths that still read them are not
- * broken while new code reads the term calendar.
- */
+/** Saves the default report form and the term calendar dates for the selected examination's term. */
 export async function saveReportSettings(formData: FormData) {
   const { supabase, user, tenantId } = await getDashboardSession()
   if (!user) redirect('/login')
@@ -33,9 +18,9 @@ export async function saveReportSettings(formData: FormData) {
   if (opening && closing && closing <= opening) {
     redirect('/dashboard/reports?error=' + encodeURIComponent('Invalid date range|The opening date must be before the closing date of the same term.'))
   }
+
   const templateKey = String(formData.get('template_key') || '').trim()
   const finalTemplateKey = validTemplateKey(templateKey) ? templateKey : 'standard'
-  const templateHtml = String(formData.get('template_html') || '').trim()
 
   const { data: existing } = await supabase.from('report_templates').select('id').eq('tenant_id', tenantId).eq('is_default', true).maybeSingle()
   let templateId = existing?.id
@@ -45,13 +30,10 @@ export async function saveReportSettings(formData: FormData) {
       .insert({ tenant_id: tenantId, name: 'Default Report Form', template_json: defaultReportTemplate, is_default: true, template_key: finalTemplateKey })
       .select('id')
       .single()
-    if (error || !created) redirect('/dashboard/reports?error=' + encodeURIComponent('Error|' + (friendlyDbRedirect(error) || 'Could not ready the report template.')))
+    if (error || !created) redirect('/dashboard/reports?error=' + encodeURIComponent('Error|' + (friendlyDbRedirect(error) || 'Could not create the report template.')))
     templateId = created.id
   }
 
-  // Resolve the term the admin is editing dates for: the term of the selected
-  // examination, falling back to the school's most recent examination so the
-  // form still works before an examination has been selected.
   let examTerm: string | null = null
   let examYear: number | null = null
   const selectedExamId = String(formData.get('exam') || '').trim()
@@ -97,15 +79,11 @@ export async function saveReportSettings(formData: FormData) {
 
   const { error: keyError } = await supabase
     .from('report_templates')
-    .update({
-      template_key: finalTemplateKey,
-      ...(finalTemplateKey === 'html_custom' && templateHtml ? { template_html: templateHtml } : {}),
-    })
+    .update({ template_key: finalTemplateKey })
     .eq('id', templateId)
     .eq('tenant_id', tenantId)
   if (keyError) redirect('/dashboard/reports?error=' + encodeURIComponent('Error|' + (friendlyDbRedirect(keyError) || 'Could not save the report template selection.')))
 
-  // Preserve the current report selection so the save does not lose the grade/stream/assessment.
   const params = new URLSearchParams()
   for (const key of ['exam', 'class', 'stream'] as const) {
     const value = String(formData.get(key) || '').trim()
