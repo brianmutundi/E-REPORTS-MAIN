@@ -25,15 +25,66 @@ export const templateFields: { section: keyof Omit<ReportTemplate, 'assessmentCo
   { section: 'school', key: 'name', label: 'School name' }, { section: 'school', key: 'logo', label: 'School logo' }, { section: 'school', key: 'contact', label: 'School contact details (P.O Box / address)' }, { section: 'student', key: 'name', label: 'Student name' }, { section: 'student', key: 'admissionNo', label: 'Admission number' }, { section: 'student', key: 'className', label: 'Grade' }, { section: 'student', key: 'stream', label: 'Stream' }, { section: 'examination', key: 'name', label: 'Examination name' }, { section: 'examination', key: 'academicYear', label: 'Academic year' }, { section: 'examination', key: 'term', label: 'Term / period' }, { section: 'results', key: 'learningArea', label: 'Learning area' }, { section: 'results', key: 'grade', label: 'Level (grade)' }, { section: 'results', key: 'gradeDescription', label: 'Grade description' }, { section: 'results', key: 'total', label: 'Total' }, { section: 'results', key: 'average', label: 'Average / mean' }, { section: 'additional', key: 'teacherComment', label: 'Grade class teacher remark' }, { section: 'additional', key: 'overallComment', label: 'Principal remark' }, { section: 'additional', key: 'signatureArea', label: 'Signature area' },
 ]
 export type ReportTenant = { name: string; logo_url: string | null; address: string | null }
+
+/**
+ * Resolve the authenticated school's tenant row without ever weakening tenant
+ * isolation. The normal path uses the caller's RLS-protected client. The
+ * service-role client is only a server-side fallback for environments where
+ * the authenticated query cannot read the tenant row; it is still constrained
+ * to the exact tenantId supplied by the authenticated report session.
+ */
 export async function getReportTenant(supabase: SupabaseClient, tenantId: string): Promise<ReportTenant | null> {
+  if (!tenantId) return null
+
+  const primary = await supabase
+    .from('tenants')
+    .select('name,logo_url,address')
+    .eq('id', tenantId)
+    .maybeSingle()
+
+  if (!primary.error && primary.data) return primary.data as ReportTenant
+
+  // Keep compatibility with databases where the address column is not yet
+  // present in the API schema cache. Never turn a missing optional field into
+  // a missing school profile.
+  if (primary.error) {
+    const basic = await supabase
+      .from('tenants')
+      .select('name,logo_url')
+      .eq('id', tenantId)
+      .maybeSingle()
+    if (!basic.error && basic.data) return { ...basic.data, address: null } as ReportTenant
+
+    console.error('Assessment report school profile lookup failed', {
+      tenantId,
+      primaryError: primary.error.message,
+      basicError: basic.error?.message ?? null,
+    })
+  }
+
+  // Server-only fallback. This never changes the requested tenant ID and does
+  // not bypass the ownership checks already performed by the report route.
   try {
     const admin = createAdminClient()
-    const { data, error } = await admin.from('tenants').select('name,logo_url,address').eq('id', tenantId).maybeSingle()
-    if (!error && data) return data as ReportTenant
-  } catch {}
+    const adminResult = await admin
+      .from('tenants')
+      .select('name,logo_url,address')
+      .eq('id', tenantId)
+      .maybeSingle()
+    if (!adminResult.error && adminResult.data) return adminResult.data as ReportTenant
 
-  const { data, error } = await supabase.from('tenants').select('name,logo_url,address').eq('id', tenantId).maybeSingle()
-  if (!error && data) return data as ReportTenant
-  const { data: basic } = await supabase.from('tenants').select('name,logo_url').eq('id', tenantId).maybeSingle()
-  return basic ? { ...basic, address: null } : null
+    if (adminResult.error) {
+      console.error('Assessment report admin school profile lookup failed', {
+        tenantId,
+        error: adminResult.error.message,
+      })
+    }
+  } catch (error) {
+    console.error('Assessment report admin school profile client unavailable', {
+      tenantId,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    })
+  }
+
+  return null
 }
