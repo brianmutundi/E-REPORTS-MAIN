@@ -15,57 +15,45 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 1
-      - name: Remove obsolete report settings copy and custom HTML UI
+      - name: Clean report settings UI
         run: |
           python - <<'PY'
           from pathlib import Path
+          import re
 
           path = Path('app/dashboard/reports/page.tsx')
           text = path.read_text()
 
-          replacements = [
-              ("    const htmlSource = templateRow?.template_html ?? ''\n", ""),
-              ("    <div className=\"top no-print\"><div><div className=\"eyebrow\">Assessment reports</div><h1 className=\"title\">Student Assessment Reports</h1><p className=\"muted\">Choose the report form, set the term dates for this school, and select an examination and grade to view the report form.</p></div></div>",
-               "    <div className=\"top no-print\"><div><div className=\"eyebrow\">Assessment reports</div><h1 className=\"title\">Student Assessment Reports</h1></div></div>"),
-              ("          <p className=\"muted\">The selected form renders the PDF reports. Term dates are stored per {currentTermRef?.label ?? 'term'}{currentTermRef ? ` · ${currentTermRef.year}` : ''}; generated reports show this term&apos;s closing date and the next term&apos;s opening date (&ldquo;To be announced&rdquo; until the next term opening is set).</p>\n", ""),
-              ("          <label className=\"field-label\">Opening date <span className=\"opacity-60\">({currentTermRef?.label ?? 'term'})</span><input type=\"date\" name=\"opening_date\" defaultValue={openingDate ?? ''} /></label>",
-               "          <label className=\"field-label\">Opening date<input type=\"date\" name=\"opening_date\" defaultValue={openingDate ?? ''} /></label>"),
-              ("          <label className=\"field-label\">Closing date <span className=\"opacity-60\">({currentTermRef?.label ?? 'term'})</span><input type=\"date\" name=\"closing_date\" defaultValue={closingDate ?? ''} /></label>",
-               "          <label className=\"field-label\">Closing date<input type=\"date\" name=\"closing_date\" defaultValue={closingDate ?? ''} /></label>"),
-              ("        {templateKey === 'html_custom' && (\n          <div style={{ marginTop: 12 }}>\n            <label className=\"field-label\">Custom HTML template — Handlebars placeholders\n              <textarea name=\"template_html\" rows={14} style={{ width: '100%', fontFamily: 'monospace', fontSize: 12 }} defaultValue={htmlSource || ''} placeholder=\"Paste the raw HTML template here, or leave blank to use the built-in CBC gemini-code template.\" />\n            </label>\n            <p className=\"muted\">Same placeholders as the CBC report (school, student, performance_levels, subjects, summary, term, financials, remarks). Rendered to PDF with the built-in engine.</p>\n          </div>\n        )}\n", ""),
-              ("        <div className=\"actions-inline\" style={{ marginTop: 14 }}>\n          <p className=\"muted\" style={{ margin: '0 12px 0 0' }}>Reports will show: closes <b>{currentClosingDate ?? '____________'}</b> &middot; next term opens <b>{nextOpeningDate}</b></p>\n          <SubmitButton>Save report settings</SubmitButton>\n        </div>",
-               "        <div className=\"actions-inline\" style={{ marginTop: 14 }}>\n          <SubmitButton>Save report settings</SubmitButton>\n        </div>"),
-          ]
+          text = re.sub(r"\n\s*const htmlSource = templateRow\?\.template_html \?\? ''", "", text, count=1)
+          text = re.sub(r"\n\s*<p className=\"muted\">Choose the report form, set the term dates for this school, and select an examination and grade to view the report form\.</p>", "", text, count=1)
+          text = re.sub(r"\n\s*<p className=\"muted\">The selected form renders the PDF reports\..*?</p>", "", text, count=1)
+          text = re.sub(r"\s*<span className=\"opacity-60\">\(\{currentTermRef\?\.label \?\? 'term'\}\)</span>", "", text)
+          text = re.sub(r"\n\s*\{templateKey === 'html_custom' && \(.*?\n\s*\)\}", "", text, count=1, flags=re.S)
+          text = re.sub(r"\n\s*<p className=\"muted\" style=\{\{ margin: '0 12px 0 0' \}\}>Reports will show: closes .*?</p>", "", text, count=1)
 
-          for old, new in replacements:
-              if old not in text:
-                  raise SystemExit(f'Missing expected text: {old[:120]!r}')
-              text = text.replace(old, new, 1)
-
-          # The preview-only date variables are no longer needed on this page.
+          text = text.replace(", getEffectiveTermDates, NEXT_TERM_OPENING_PLACEHOLDER", "")
+          text = text.replace("import { parseTermReference, getTermRowDates, getEffectiveTermDates, NEXT_TERM_OPENING_PLACEHOLDER } from '@/lib/terms'", "import { parseTermReference, getTermRowDates } from '@/lib/terms'")
           text = text.replace("  const currentClosingDate = effectiveDates.closingDate\n", "")
           text = text.replace("  const nextOpeningDate = effectiveDates.openingDate ?? NEXT_TERM_OPENING_PLACEHOLDER\n", "")
-          text = text.replace("import { parseTermReference, getTermRowDates, getEffectiveTermDates, NEXT_TERM_OPENING_PLACEHOLDER } from '@/lib/terms'", "import { parseTermReference, getTermRowDates } from '@/lib/terms'")
           text = text.replace("    getEffectiveTermDates(supabase, tenantId, currentTermRef),\n", "")
-          text = text.replace("  const [termRowDates, effectiveDates] = await Promise.all([\n", "  const [termRowDates] = await Promise.all([\n")
-          text = text.replace("    currentTermRef ? getTermRowDates(supabase, tenantId, currentTermRef) : Promise.resolve({ opening_date: null, closing_date: null }),\n  ])", "    currentTermRef ? getTermRowDates(supabase, tenantId, currentTermRef) : Promise.resolve({ opening_date: null, closing_date: null }),\n  ])")
+          text = text.replace("  const [termRowDates, effectiveDates] = await Promise.all([", "  const [termRowDates] = await Promise.all([")
           text = text.replace("select('id,name,template_json,template_key,template_html')", "select('id,name,template_json,template_key')")
           text = text.replace("select('id,name,template_json,template_html')", "select('id,name,template_json')")
           text = text.replace("; template_html?: string | null", "")
           text = text.replace("; template_html?: string | null", "")
-          text = text.replace(" as { id: string | null; name: string | null; template_json: unknown; template_html?: string | null }", " as { id: string | null; name: string | null; template_json: unknown }")
+          text = text.replace("; template_json: unknown; template_html?: string | null", "; template_json: unknown")
 
           path.write_text(text)
           PY
 
-          if git diff --quiet -- app/dashboard/reports/page.tsx; then
-            echo 'No changes made'
-            exit 1
-          fi
-
+          grep -nE "Choose the report form|The selected form renders|template_html|html_custom|Reports will show: closes|\(\{currentTermRef" app/dashboard/reports/page.tsx || true
           git diff --check
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add app/dashboard/reports/page.tsx
+          if git diff --cached --quiet; then
+            echo 'No report settings UI changes required.'
+            exit 0
+          fi
           git commit -m 'fix: simplify report settings and remove custom HTML UI'
           git push
