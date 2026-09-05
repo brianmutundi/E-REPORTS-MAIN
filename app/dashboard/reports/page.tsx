@@ -18,7 +18,6 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const { supabase, user, tenantId } = await getDashboardSession()
   if (!user) return <main className="main"><p>Please sign in.</p></main>
   if (!tenantId) return <main className="main"><p>No school is linked to this account.</p></main>
-  // Round 1 — independent lookups in parallel (each Supabase round-trip is ~300ms of remote latency, so batching these avoids a serial waterfall that added up).
   const [classesRes, templateRes, gradingScale, streams, exams, tenant] = await Promise.all([
     supabase.from('classes').select('id,name,teacher_name,principal_name').eq('tenant_id', tenantId).order('name'),
     supabase.from('report_templates').select('id,name,template_json,template_key').eq('tenant_id', tenantId).eq('is_default', true).maybeSingle(),
@@ -41,7 +40,6 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const hasExams = exams.length > 0
   const gradeValid = Boolean(params.class && (classes ?? []).some(c => c.id === params.class))
   const hasSelection = Boolean(params.exam && params.class && gradeValid)
-  // Term calendar context: the settings form edits dates for the term of the currently selected examination (falling back to the school's latest examination), while the report preview shows the CURRENT term's closing and the NEXT term's opening ("To be announced" when not yet configured).
   const termFallbackExam = hasSelection ? (exams?.find(e => e.id === params.exam) ?? null) ?? (exams?.at(-1) ?? null) : (exams?.at(-1) ?? null)
   const currentTermRef = parseTermReference({ term: termFallbackExam?.term ?? null, academicYear: termFallbackExam?.academic_year ?? null })
   const [termRowDates, effectiveDates] = await Promise.all([
@@ -51,14 +49,12 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const openingDate = termRowDates.opening_date
   const closingDate = termRowDates.closing_date
   const storedDatesValid = !openingDate || !closingDate || openingDate < closingDate
-  // Never pre-fill a tenant's settings form with an already-invalid legacy pair.
-  // This is deliberately local to the authenticated tenant; another school's
-  // settings cannot influence these values.
+  // A legacy/reversed date pair belongs only to this authenticated tenant.
+  // Do not let it be submitted unchanged, and never use another tenant's dates.
   const formOpeningDate = storedDatesValid ? openingDate : null
   const formClosingDate = storedDatesValid ? closingDate : null
   const currentClosingDate = effectiveDates.closingDate
   const nextOpeningDate = effectiveDates.openingDate ?? NEXT_TERM_OPENING_PLACEHOLDER
-  // Round 2 — the configured report detail and the heavy computed results (needs template + class) are independent of each other.
   const [configured, remarkBanks] = hasSelection
     ? await Promise.all([
         getConfiguredAssessmentResults(params.exam!, params.class!, template.assessmentComponents, params.stream),
@@ -111,16 +107,11 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
 
   return <main className="main" style={{ maxWidth: 1120, margin: '0 auto' }}>
     <div className="top no-print"><div><div className="eyebrow">Assessment reports</div><h1 className="title">Student Assessment Reports</h1></div></div>
-
     {params.error && (() => { const idx = params.error.indexOf('|'); return idx > -1 ? <div className="notice error no-print" style={{ marginTop: 16 }}><span className="font-semibold">{params.error.slice(0, idx)}</span><span className="block text-xs opacity-80 mt-0.5">{params.error.slice(idx + 1)}</span></div> : <div className="notice error no-print" style={{ marginTop: 16 }}>{params.error}</div> })()}
     {params.saved && <SuccessToast message="Report settings saved" />}
 
     <section className="card no-print" style={{ marginTop: 20 }}>
-      <div className="section-heading">
-        <div>
-          <h2 className="section-title">Report settings</h2>
-        </div>
-      </div>
+      <div className="section-heading"><div><h2 className="section-title">Report settings</h2></div></div>
       <form action={saveReportSettings}>
         <input type="hidden" name="exam" value={params.exam ?? ''} />
         <input type="hidden" name="class" value={params.class ?? ''} />
@@ -130,9 +121,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
           <label className="field-label">Opening date<input type="date" name="opening_date" defaultValue={formOpeningDate ?? ''} /></label>
           <label className="field-label">Closing date<input type="date" name="closing_date" defaultValue={formClosingDate ?? ''} /></label>
         </div>
-        <div className="actions-inline" style={{ marginTop: 14 }}>
-          <SubmitButton>Save report settings</SubmitButton>
-        </div>
+        <div className="actions-inline" style={{ marginTop: 14 }}><SubmitButton>Save report settings</SubmitButton></div>
       </form>
     </section>
 
@@ -142,31 +131,9 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
         submitLabel="Load Students"
         values={{ class: params.class, stream: params.stream, exam: params.exam }}
         fields={[
-          {
-            name: 'class',
-            label: 'Grade',
-            placeholder: 'Select grade',
-            required: true,
-            clears: ['stream', 'exam'],
-            options: (classes ?? []).map(c => ({ value: c.id, label: c.name })),
-          },
-          {
-            name: 'stream',
-            label: 'Stream',
-            placeholder: !params.class ? 'Select grade first' : hasStreams ? 'Stream (all)' : 'No streams',
-            disabled: !hasStreams,
-            clears: ['exam'],
-            options: streams.map(s => ({ value: s.id, label: s.name })),
-          },
-          {
-            name: 'exam',
-            label: 'Assessment',
-            placeholder: !params.class ? 'Select grade first' : hasExams ? 'Examination' : 'No assessments',
-            required: true,
-            disabled: !hasExams || !params.class,
-            clears: [],
-            options: exams.map(e => ({ value: e.id, label: e.name })),
-          },
+          { name: 'class', label: 'Grade', placeholder: 'Select grade', required: true, clears: ['stream', 'exam'], options: (classes ?? []).map(c => ({ value: c.id, label: c.name })) },
+          { name: 'stream', label: 'Stream', placeholder: !params.class ? 'Select grade first' : hasStreams ? 'Stream (all)' : 'No streams', disabled: !hasStreams, clears: ['exam'], options: streams.map(s => ({ value: s.id, label: s.name })) },
+          { name: 'exam', label: 'Assessment', placeholder: !params.class ? 'Select grade first' : hasExams ? 'Examination' : 'No assessments', required: true, disabled: !hasExams || !params.class, clears: [], options: exams.map(e => ({ value: e.id, label: e.name })) },
         ]}
       />
     </div>
@@ -180,7 +147,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
           {results.length > 0 && <a className="btn" href={batchHref} download>{hasStreams ? 'Generate Batch PDF' : 'Generate Grade PDF'}</a>}
           {results.length > 0 && <a className="btn secondary" href={transcriptBatchHref} download>Transcript PDF</a>}
         </div>
-                    {results.length === 0 ? <div className="notice error">No students were found in the selected grade.</div> : <div style={{ display: 'grid', gap: 10 }}>{results.map(student => <div key={student.studentId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '14px 16px', border: '1px solid #e2e8f0', borderRadius: 12, background: params.student === student.studentId ? '#f8fafc' : 'white', flexWrap: 'wrap' }}><div style={{ minWidth: 0, flex: '1 1 250px' }}><div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', fontFamily: 'monospace' }}>{student.admissionNo}</div><div style={{ fontWeight: 700, color: '#0f172a', marginTop: 3 }}>{student.fullName}</div></div><div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}><span style={{ display: 'inline-flex', alignItems: 'center', padding: '5px 9px', borderRadius: 999, fontSize: 12, fontWeight: 700, background: student.complete ? '#ecfdf5' : '#fff7ed', color: student.complete ? '#047857' : '#c2410c' }}>{student.complete ? 'Complete' : 'Incomplete'}</span><Link className="btn secondary" href={`/dashboard/reports?exam=${params.exam}&class=${params.class}${params.stream ? `&stream=${params.stream}` : ''}&student=${student.studentId}`}>View Report</Link><Link className="btn secondary" href={`/api/transcript/pdf?class=${params.class}&student=${student.studentId}`} target="_blank">Transcript</Link></div></div>)}</div>}
+        {results.length === 0 ? <div className="notice error">No students were found in the selected grade.</div> : <div style={{ display: 'grid', gap: 10 }}>{results.map(student => <div key={student.studentId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '14px 16px', border: '1px solid #e2e8f0', borderRadius: 12, background: params.student === student.studentId ? '#f8fafc' : 'white', flexWrap: 'wrap' }}><div style={{ minWidth: 0, flex: '1 1 250px' }}><div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', fontFamily: 'monospace' }}>{student.admissionNo}</div><div style={{ fontWeight: 700, color: '#0f172a', marginTop: 3 }}>{student.fullName}</div></div><div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}><span style={{ display: 'inline-flex', alignItems: 'center', padding: '5px 9px', borderRadius: 999, fontSize: 12, fontWeight: 700, background: student.complete ? '#ecfdf5' : '#fff7ed', color: student.complete ? '#047857' : '#c2410c' }}>{student.complete ? 'Complete' : 'Incomplete'}</span><Link className="btn secondary" href={`/dashboard/reports?exam=${params.exam}&class=${params.class}${params.stream ? `&stream=${params.stream}` : ''}&student=${student.studentId}`}>View Report</Link><Link className="btn secondary" href={`/api/transcript/pdf?class=${params.class}&student=${student.studentId}`} target="_blank">Transcript</Link></div></div>)}</div>}
         <SmsSendQueue items={smsItems} />
       </section>
     )}
@@ -196,31 +163,45 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
           <p className="report-title">Assessment Report</p>
           {template.examination.name && <strong>{exam?.name}</strong>}
           {template.examination.term && exam?.term ? ` · ${exam.term}` : ''}
-          {template.examination.academicYear && exam?.academic_year ? ` · ${exam?.academic_year}` : ''}
+          {template.examination.academicYear && exam?.academic_year ? ` · ${exam.academic_year}` : ''}
         </div>
-
         <div className="student-meta">
           {template.student.name && <div><strong>Student</strong><br />{selected.fullName}</div>}
           {template.student.admissionNo && <div><strong>Admission No.</strong><br />{selected.admissionNo}</div>}
           {template.student.className && <div><strong>Grade</strong><br />{className ?? '—'}</div>}
-          {template.student.stream && <div><strong>Stream</strong><br />{selected.streamName ?? '—'}</div>}
+          {selected.streamName ? <div><strong>Stream</strong><br />{selected.streamName}</div> : null}
         </div>
-
+        {template.results.grade && gradingScale.length > 0 && (
+          <div className="grading-key" style={{ width: '100%', margin: '12px 0', border: '1px solid #333', fontFamily: 'Arial, sans-serif', fontSize: gradingScale.length > 4 ? 9 : 10 }}>
+            <div style={{ backgroundColor: '#e6e6e6', textAlign: 'center', fontWeight: 'bold', padding: 3, borderBottom: '1px solid #333', fontSize: gradingScale.length > 4 ? 10 : 11 }}>PERFORMANCE LEVEL KEY ({gradingScale.length}-LEVEL SCALE)</div>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'center', tableLayout: 'fixed' }}>
+              <thead><tr style={{ backgroundColor: '#f9f9f9', borderBottom: '1px solid #333' }}>{gradingScale.map(r => <th key={r.grade} style={{ borderRight: '1px solid #333', padding: 4, fontWeight: 'bold' }}>{r.grade}</th>)}</tr></thead>
+              <tbody>
+                <tr style={{ borderBottom: '1px solid #333' }}>{gradingScale.map(r => <td key={r.grade} style={{ borderRight: '1px solid #333', padding: 4, fontSize: gradingScale.length > 4 ? 8 : 9, fontWeight: 'bold' }}>{r.description.toUpperCase()}</td>)}</tr>
+                <tr>{gradingScale.map(r => { const min = Math.ceil(r.min); const max = Math.floor(r.max); const range = min === max ? `${min}` : `${min} - ${max}`; return <td key={r.grade} style={{ borderRight: '1px solid #333', padding: 4, fontSize: gradingScale.length > 4 ? 8 : undefined }}>{range}</td> })}</tr>
+              </tbody>
+            </table>
+          </div>
+        )}
+        {!selected.complete && <div className="notice error">Incomplete result — required assessment marks are missing. Missing marks are not treated as zero.</div>}
         <table className="report-table">
-          <thead><tr><th>Learning Area</th>{scoreLabels.map(label => <th key={label}>{scoreHeader(label)}</th>)}<th>Grade</th></tr></thead>
-          <tbody>{selected.subjects.map(s => <tr key={s.subjectId}><td>{s.subjectName}</td>{template.assessmentComponents.midTerm && <td>{s.midTerm == null ? 'ABS' : s.midTerm.toFixed(1)}</td>}{template.assessmentComponents.endTerm && <td>{s.endTerm == null ? 'ABS' : s.endTerm.toFixed(1)}</td>}{template.assessmentComponents.average && <td>{s.average == null ? 'ABS' : s.average.toFixed(1)}</td>}<td>{s.grade ?? '—'}</td></tr>)}<tr><td><strong>Total</strong></td>{template.assessmentComponents.midTerm && <td><strong>{selected.midTermTotal == null ? 'ABS' : selected.midTermTotal.toFixed(1)}</strong></td>}{template.assessmentComponents.endTerm && <td><strong>{selected.endTermTotal == null ? 'ABS' : selected.endTermTotal.toFixed(1)}</strong></td>}{template.assessmentComponents.average && <td><strong>{selected.averageTotal == null ? 'ABS' : selected.averageTotal.toFixed(1)}</strong></td>}<td><strong>{selected.overallLevel ?? '—'}</strong></td></tr></tbody>
+          <thead><tr>{template.results.learningArea && <th>Learning Area</th>}{template.assessmentComponents.midTerm && <th>{scoreHeader('Mid Term')}</th>}{template.assessmentComponents.endTerm && <th>{scoreHeader('End Term')}</th>}{template.assessmentComponents.average && <th>{scoreHeader('Score')}</th>}{template.results.grade && <th>Level</th>}{template.results.gradeDescription && <th>Description</th>}</tr></thead>
+          <tbody>{selected.subjects.map(s => <tr key={s.subjectId}>{template.results.learningArea && <td>{s.subjectName}</td>}{template.assessmentComponents.midTerm && <td>{s.midTerm === null ? 'ABS' : s.midTerm.toFixed(2)}</td>}{template.assessmentComponents.endTerm && <td>{s.endTerm === null ? 'ABS' : s.endTerm.toFixed(2)}</td>}{template.assessmentComponents.average && <td>{s.average === null ? 'ABS' : s.average.toFixed(2)}</td>}{template.results.grade && <td>{s.grade || '—'}</td>}{template.results.gradeDescription && <td>{s.gradeDescription || '—'}</td>}</tr>)}</tbody>
+          {(template.results.total || template.results.average || template.results.grade) && (() => {
+            const span = Math.max(1, (template.assessmentComponents.midTerm ? 1 : 0) + (template.assessmentComponents.endTerm ? 1 : 0) + (template.assessmentComponents.average ? 1 : 0) + (template.results.grade ? 1 : 0) + (template.results.gradeDescription ? 1 : 0))
+            return <tfoot>{template.results.total && (template.assessmentComponents.midTerm || template.assessmentComponents.endTerm || template.assessmentComponents.average) && <tr><th>Total</th><th colSpan={span}>{selected.total === null ? '—' : `${selected.total}`}</th></tr>}{template.results.average && template.assessmentComponents.average && <tr><th>Average</th><th colSpan={span}>{selected.average === null ? '—' : selected.average.toFixed(2)}</th></tr>}{template.results.grade && selected.overallLevel && <tr><th>Overall Performance Level</th><th colSpan={span}>{selected.overallLevel}{selected.overallDescription ? ` — ${selected.overallDescription}` : ''}</th></tr>}</tfoot>
+          })()}
         </table>
-
-        <div className="report-footer-grid">
-          <div><strong>Grade Class Teacher</strong><br />{classTeacherName ?? '—'}</div>
-          <div><strong>Class Teacher's Remark</strong><br />{selected.teacherRemark || remarkForLevel(teacherRemarks, selected.overallLevel) || '—'}</div>
-          <div><strong>Principal's Remark</strong><br />{selected.principalRemark || remarkForLevel(principalRemarks, selected.overallLevel) || '—'}</div>
-          <div><strong>Closing date</strong><br />{currentClosingDate ?? '—'}</div>
-          <div><strong>Next term opening</strong><br />{nextOpeningDate}</div>
-          <div><strong>Principal</strong><br />{classPrincipalName ?? '—'}</div>
+        <div className="financial-information" aria-label="Financial Information">
+          <div className="financial-information-title">Financial Information</div>
+          <div className="financial-information-row"><span>Fee Balance</span><span className="financial-line">________________</span></div>
+          <div className="financial-information-row"><span>Next Term Fee</span><span className="financial-line">________________</span></div>
         </div>
-
-        <div className="no-print" style={{ marginTop: 16, display: 'flex', justifyContent: 'center' }}><PrintButton /></div>
+        {(currentClosingDate || nextOpeningDate) ? <div className="report-term-line">School Closes on <strong>{currentClosingDate ?? '____________'}</strong> and opens on <strong>{nextOpeningDate}</strong></div> : null}
+        {template.additional.teacherComment && <div className="preview-note report-remark"><b>Remark (Grade Class Teacher)</b><p className="remark-text">{remarkForLevel(selected.overallLevel, gradingScale, teacherRemarks) || '____________________________'}</p></div>}
+        {template.additional.overallComment && <div className="preview-note report-remark"><b>Remark (Principal)</b><p className="remark-text">{remarkForLevel(selected.overallLevel, gradingScale, principalRemarks) || '____________________________'}</p></div>}
+        {template.additional.signatureArea && <div className="signature-block"><div className="signature-row"><span>Grade Class Teacher&apos;s Name: {classTeacherName || '________________'}</span><span>Sign: ____________</span><span>Date: ____________</span></div><div className="signature-row"><span>Principal&apos;s Name: {classPrincipalName || '________________'}</span><span>Sign: ____________</span><span>Date: ____________</span></div></div>}
+        <div className="report-actions no-print"><PrintButton href={`/api/reports/pdf?exam=${params.exam}&class=${params.class}${params.stream ? `&stream=${params.stream}` : ''}&student=${selected.studentId}`} /></div>
       </section>
     )}
   </main>
