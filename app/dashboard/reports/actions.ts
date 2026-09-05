@@ -15,8 +15,12 @@ export async function saveReportSettings(formData: FormData) {
 
   const opening = String(formData.get('opening_date') || '').trim() || null
   const closing = String(formData.get('closing_date') || '').trim() || null
-  if (opening && closing && closing <= opening) {
-    redirect('/dashboard/reports?error=' + encodeURIComponent('Invalid date range|The opening date must be before the closing date of the same term.'))
+
+  // Opening and closing belong to the same selected term: opening must be
+  // strictly earlier than closing. The NEXT term opening is validated
+  // separately below and must be strictly later than this term's closing.
+  if (opening && closing && opening >= closing) {
+    redirect('/dashboard/reports?error=' + encodeURIComponent('Invalid date range|The opening date must be before the closing date.'))
   }
 
   const templateKey = String(formData.get('template_key') || '').trim()
