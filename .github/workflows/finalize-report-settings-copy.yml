@@ -1,0 +1,33 @@
+name: Finalize report settings copy
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Remove obsolete copy
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('app/dashboard/reports/page.tsx')
+          text = path.read_text()
+          old = '<p className="muted">Choose the report form, set the term dates for this school, and select an examination and grade to view the report form.</p>'
+          if old not in text:
+              raise SystemExit('Expected obsolete copy not found')
+          text = text.replace(old, '', 1)
+          path.write_text(text)
+          PY
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app/dashboard/reports/page.tsx
+          git commit -m 'fix: remove obsolete report settings page copy'
+          git push
