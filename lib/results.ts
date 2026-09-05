@@ -1,5 +1,5 @@
 import { getDashboardSession } from '@/lib/supabase/session'
-import { computeTotal, computeTotalMaximum, getGrade, getTotalLevel, getTotalDescription, getTenantGradingScale, getTenantTotalGradingScale, type GradeRule } from './grading'
+import { computeTotal, computeTotalMaximum, getGrade, getTotalLevel, getTotalDescription, getTenantGradingScale, getTenantTotalGradingScale, calculateAchievement, type GradeRule } from './grading'
 import { getScopeSubjects } from './scope'
 import type { AssessmentComponents } from './report-template'
 
@@ -72,7 +72,6 @@ export async function getExamResults(examId: string, classId: string, streamId?:
   const expectedSubjects = columns.length
   const scale: GradeRule[] = await getTenantGradingScale(tenantId)
   const totalScale = await getTenantTotalGradingScale(tenantId)
-  const totalMaximum = expectedSubjects * 100
   const byStudent = new Map<string, { subjectId: string; subjectName: string; score: number }[]>()
   for (const mark of marks ?? []) {
     const subject = Array.isArray(mark.subjects) ? mark.subjects[0] : mark.subjects
@@ -88,7 +87,11 @@ export async function getExamResults(examId: string, classId: string, streamId?:
     const total = computeTotal(subjects.map(s => s.score))
     const average = subjects.length ? total / subjects.length : 0
     const complete = expectedSubjects > 0 && subjects.length >= expectedSubjects
-    return { studentId: student.id, admissionNo: student.admission_no, fullName: student.full_name, streamId: student.stream_id ?? null, streamName: student.stream_id ? (streamNames.get(student.stream_id) ?? null) : null, total, average, grade: complete ? getGrade(average, scale) : '', overallLevel: getTotalLevel(total, totalMaximum, totalScale, scale), overallDescription: getTotalDescription(total, totalMaximum, totalScale, scale), complete, expectedSubjects, subjects }
+    // The overall level is normalised against the learner's ASSESSED learning
+    // areas only, so missing (blank) scores never depress the overall level —
+    // and when the learner is complete this equals expectedSubjects exactly.
+    const rowTotalMaximum = subjects.length * 100
+    return { studentId: student.id, admissionNo: student.admission_no, fullName: student.full_name, streamId: student.stream_id ?? null, streamName: student.stream_id ? (streamNames.get(student.stream_id) ?? null) : null, total, average, grade: complete ? getGrade(average, scale) : '', overallLevel: getTotalLevel(total, rowTotalMaximum, totalScale, scale), overallDescription: getTotalDescription(total, rowTotalMaximum, totalScale, scale), complete, expectedSubjects, subjects }
   })
   return { results: rows.sort((a, b) => a.fullName.localeCompare(b.fullName)), columns }
 }
@@ -239,7 +242,7 @@ export async function getConfiguredAssessmentResults(
         : null
       const gradeScore = average ?? (components.endTerm ? item.endTerm : null) ?? (components.midTerm ? item.midTerm : null)
       const grade = gradeScore === null ? '' : getGrade(gradeScore, scale)
-      const rule = scale.find(r => gradeScore !== null && gradeScore >= r.min && gradeScore <= r.max)
+      const rule = gradeScore === null ? undefined : calculateAchievement(gradeScore, scale)
       return { subjectId, subjectName: item.name, midTerm: components.midTerm ? item.midTerm : null, endTerm: components.endTerm ? item.endTerm : null, average, grade, gradeDescription: rule?.description ?? '' }
     }).sort((a, b) => a.subjectName.localeCompare(b.subjectName))
     const complete = subjects.length > 0 && subjects.every(s => (!components.midTerm || s.midTerm !== null) && (!components.endTerm || s.endTerm !== null) && (!averageSourceExamId || s.average !== null))

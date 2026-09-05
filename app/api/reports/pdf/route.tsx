@@ -77,10 +77,8 @@ function ReportPage({ tenant, examName, term, academicYear, className, template,
   const metaItems = [
     template.student.name ? { label: 'STUDENT', value: result.fullName } : null,
     template.student.admissionNo ? { label: 'ADM. NO', value: result.admissionNo } : null,
-    template.student.className ? { label: 'CLASS', value: className } : null,
+    template.student.className ? { label: 'GRADE', value: className } : null,
     result.streamName ? { label: 'STREAM', value: result.streamName } : null,
-    template.results.position ? { label: 'GRADE POSITION', value: result.complete ? `${result.position}` : '—' } : null,
-    template.results.position && result.streamPosition !== null ? { label: 'STREAM POSITION', value: `${result.streamPosition}` } : null,
   ].filter(Boolean) as { label: string; value: string }[]
   const metaItemWidth = metaItems.length <= 2 ? '50%' : metaItems.length === 3 ? '33.333%' : '25%'
 
@@ -141,8 +139,6 @@ function ReportPage({ tenant, examName, term, academicYear, className, template,
       {template.results.total && (template.assessmentComponents.midTerm || template.assessmentComponents.endTerm || template.assessmentComponents.average) && <Text style={{ fontWeight: 700 }}>TOTAL: {result.total === null ? '—' : `${result.total}`}</Text>}
       {template.results.average && template.assessmentComponents.average && <Text>Average: {result.average === null ? '—' : result.average.toFixed(2)}</Text>}
       {template.results.grade && result.overallLevel && <Text>Overall Performance Level: {result.overallLevel}{result.overallDescription ? ` — ${result.overallDescription}` : ''}</Text>}
-      {template.results.position && result.streamPosition !== null && <Text>Stream Position: {result.streamPosition}</Text>}
-      {template.results.position && <Text>Grade Position: {result.position ?? '—'}</Text>}
     </View>
     <View style={styles.financial} wrap={false}>
       <Text style={styles.financialTitle}>Financial Information</Text>
@@ -150,11 +146,11 @@ function ReportPage({ tenant, examName, term, academicYear, className, template,
       <View style={styles.financialRow}><Text style={styles.financialLabel}>Next Term Fee</Text><Text style={styles.financialLine}>________________</Text></View>
     </View>
     {(openingDate || closingDate) && <View style={{ marginTop: 8 }}><Text style={{ fontSize: 9 }}>School Closes on <Text style={{ fontWeight: 700 }}>{closingDate ?? '_____________'}</Text> and opens on <Text style={{ fontWeight: 700 }}>{openingDate ?? '_____________'}</Text></Text></View>}
-    {template.additional.teacherComment && <View style={styles.note}><Text>Remark (Class teacher):</Text><Text>{teacherRemark || '______________________________________________'}</Text></View>}
+    {template.additional.teacherComment && <View style={styles.note}><Text>Remark (Grade Class Teacher):</Text><Text>{teacherRemark || '______________________________________________'}</Text></View>}
     {template.additional.overallComment && <View style={styles.note}><Text>Remark (Principal):</Text><Text>{principalRemark || '______________________________________________'}</Text></View>}
     {template.additional.signatureArea && (
       <View style={styles.signatureBlock}>
-        <View style={styles.signatureRow}><Text>Class Teacher&apos;s Name: {teacherName || '____________'}</Text><Text>Sign: ____________</Text><Text>Date: ____________</Text></View>
+        <View style={styles.signatureRow}><Text>Grade Class Teacher&apos;s Name: {teacherName || '____________'}</Text><Text>Sign: ____________</Text><Text>Date: ____________</Text></View>
         <View style={[styles.signatureRow, { marginTop: 10 }]}><Text>Principal&apos;s Name: {principalName || '____________'}</Text><Text>Sign: ____________</Text><Text>Date: ____________</Text></View>
       </View>
     )}

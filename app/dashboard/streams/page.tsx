@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { getDashboardSession } from '@/lib/supabase/session'
 import SuccessToast from '@/components/SuccessToast'
 import { friendlyDbRedirect } from '@/lib/db-errors'
+import SubmitButton from '@/components/SubmitButton'
 
 const STREAM_ERR = {
   noSchool:    encodeURIComponent('Error|No school is linked to this account.'),
@@ -79,7 +80,7 @@ export default async function StreamsPage({ searchParams }: { searchParams: Prom
     <section className="card"><h2>Add stream</h2><form action={saveStream} className="inline-form">
       <label className="field-label">Grade<select name="class_id" required defaultValue=""><option value="">Select grade</option>{(classes ?? []).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
       <label className="field-label">Stream name<input name="name" placeholder="e.g. East" required /></label>
-      <button className="btn">Add stream</button>
+      <SubmitButton>Add stream</SubmitButton>
     </form></section>
     <section className="card" style={{ marginTop: 18 }}>
       {classes?.length ? classes.map(c => {

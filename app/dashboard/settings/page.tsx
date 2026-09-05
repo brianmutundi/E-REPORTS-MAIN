@@ -6,6 +6,7 @@ import SuccessToast from '@/components/SuccessToast'
 import SchoolLogoUploader from './logo-uploader'
 import ChangePasswordForm from './change-password-form'
 import { friendlyDbRedirect } from '@/lib/db-errors'
+import SubmitButton from '@/components/SubmitButton'
 
 async function saveSchool(formData: FormData) {
   'use server'
@@ -40,7 +41,7 @@ async function createAcademicYear(formData: FormData) {
   })
 
   if (error) {
-    redirect('/dashboard/settings?error=' + encodeURIComponent(`Academic year rollover|${error.message || 'The academic year could not be created.'}`))
+    redirect('/dashboard/settings?error=' + encodeURIComponent(friendlyDbRedirect(error)))
   }
 
   const summary = Array.isArray(data) ? data[0] : data
@@ -80,7 +81,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         <label className="field-label">School name<input name="name" defaultValue={tenant?.name??''} required/></label>
         <label className="field-label">School code<input name="code" defaultValue={tenant?.code??''}/></label>
         <label className="field-label">Address / P.O Box<input name="address" placeholder="P.O. Box 123 — City" defaultValue={address}/></label>
-        <button className="btn" style={{width:'max-content'}}>Save school profile</button>
+        <SubmitButton style={{width:'max-content'}}>Save school profile</SubmitButton>
       </form>
     </div>
 
@@ -95,7 +96,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           <label className="field-label">New academic year<input name="target_year" type="number" min="2000" max="2100" defaultValue={nextYear} required/></label>
         </div>
         <div className="notice" style={{margin:0}}>Grade 1 → Grade 2 → … → Grade 8 → Grade 9. Grade 9 remains Grade 9. Existing academic records and marks are not rewritten.</div>
-        <button className="btn" style={{width:'max-content'}}>Create year &amp; promote learners</button>
+        <SubmitButton style={{width:'max-content'}}>Create year &amp; promote learners</SubmitButton>
       </form>
       {(yearRows?.length ?? 0) > 0 && <div style={{display:'grid',gap:6}}>
         <div className="eyebrow">Recent academic years</div>

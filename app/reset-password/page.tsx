@@ -3,6 +3,8 @@
 import { FormEvent, useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
+import PasswordInput from '@/components/PasswordInput'
+import SubmitButton from '@/components/SubmitButton'
 
 export default function ResetPassword() {
   const [password, setPassword] = useState('')
@@ -35,5 +37,39 @@ export default function ResetPassword() {
     setTimeout(() => router.replace('/login'), 700)
   }
 
-  return <main className="main" style={{ maxWidth: 460, margin: '0 auto', paddingTop: 80 }}><div className="card"><div className="eyebrow">Account recovery</div><h1 className="title">Choose a new password</h1>{!ready ? <p className="muted">Open this page from the password reset link in your email.</p> : <form onSubmit={submit} style={{ display: 'grid', gap: 14 }}><label>New password<input value={password} onChange={e => setPassword(e.target.value)} type="password" minLength={8} required autoComplete="new-password" style={{ display:'block',width:'100%',padding:12,marginTop:6,border:'1px solid #d7deea',borderRadius:9 }}/></label><label>Confirm password<input value={confirm} onChange={e => setConfirm(e.target.value)} type="password" minLength={8} required autoComplete="new-password" style={{ display:'block',width:'100%',padding:12,marginTop:6,border:'1px solid #d7deea',borderRadius:9 }}/></label>{error&&<p role="alert" style={{color:'#b42318'}}>{error}</p>}<button className="btn" disabled={loading} type="submit">{loading?'Updating…':'Update password'}</button></form>}{message&&<p>{message}</p>}</div></main>
+  return (
+    <main id="main-content" className="main" style={{ maxWidth: 460, margin: '0 auto', paddingTop: 64 }}>
+      <div className="card">
+        <div className="eyebrow">Account recovery</div>
+        <h1 className="title">Choose a new password</h1>
+        {!ready ? (
+          <p className="muted">Open this page from the password reset link in your email.</p>
+        ) : (
+          <form onSubmit={submit} style={{ display: 'grid', gap: 16, marginTop: 8 }}>
+            <PasswordInput
+              id="new-password"
+              name="new_password"
+              label="New password"
+              autoComplete="new-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              minLength={8}
+            />
+            <PasswordInput
+              id="confirm-password"
+              name="confirm_password"
+              label="Confirm password"
+              autoComplete="new-password"
+              value={confirm}
+              onChange={(e) => setConfirm(e.target.value)}
+              minLength={8}
+            />
+            {error && <p role="alert" className="notice error">{error}</p>}
+            <SubmitButton disabled={loading}>{loading ? 'Updating…' : 'Update password'}</SubmitButton>
+          </form>
+        )}
+        {message && <p role="status" className="mt-4">{message}</p>}
+      </div>
+    </main>
+  )
 }

@@ -2,27 +2,29 @@
 
 import { revalidatePath } from 'next/cache'
 import { getDashboardSession } from '@/lib/supabase/session'
+import { friendlyDbMessage } from '@/lib/db-errors'
 
 export async function uploadSchoolLogo(logoUrl: string): Promise<{ ok: boolean; error?: string }> {
   const { supabase, user, tenantId } = await getDashboardSession()
   if (!user) return { ok: false, error: 'Not signed in' }
   if (!tenantId) return { ok: false, error: 'No school linked' }
 
-  // The report PDFs fetch the logo server-side, so only permit https URLs to
-  // avoid loading arbitrary/external resources or non-http schemes during
-  // report generation. The uploader always saves a Supabase public URL.
+  // The report PDFs fetch the logo server-side, so only permit https URLs on
+  // this project's own Supabase storage host. Any other host would be fetched
+  // by the server during report generation (SSRF surface).
   let parsed: URL
   try {
     parsed = new URL(logoUrl)
   } catch {
     return { ok: false, error: 'Invalid logo URL.' }
   }
-  if (parsed.protocol !== 'https:' || !parsed.hostname) {
-    return { ok: false, error: 'Logo URL must be a valid https address.' }
+  const storageHost = process.env.NEXT_PUBLIC_SUPABASE_URL ? new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).hostname : null
+  if (parsed.protocol !== 'https:' || !parsed.hostname || !storageHost || parsed.hostname !== storageHost) {
+    return { ok: false, error: 'Logo must be uploaded to your school storage bucket.' }
   }
 
   const { error } = await supabase.from('tenants').update({ logo_url: logoUrl }).eq('id', tenantId)
-  if (error) return { ok: false, error: error.message }
+  if (error) return { ok: false, error: friendlyDbMessage(error) }
   revalidatePath('/dashboard/settings')
   revalidatePath('/dashboard/reports')
   return { ok: true }
@@ -46,6 +48,6 @@ export async function changePassword(formData: FormData): Promise<{ ok: boolean;
   if (signIn) return { ok: false, error: 'Current password is incorrect.' }
 
   const { error } = await supabase.auth.updateUser({ password: next })
-  if (error) return { ok: false, error: error.message }
+  if (error) return { ok: false, error: friendlyDbMessage(error) }
   return { ok: true }
 }

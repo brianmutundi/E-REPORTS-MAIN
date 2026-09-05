@@ -47,6 +47,7 @@ export async function POST(request: NextRequest) {
     const filename = String(form.get('filename') || '')
     let rows: ResultsPreviewRow[]
     try { rows = JSON.parse(rowsRaw) } catch { return NextResponse.json({ error: 'Invalid preview payload.' }, { status: 400 }) }
+    if (rows.length > 10000) return NextResponse.json({ error: 'Too many rows to import at once.' }, { status: 400 })
 
     const result = await commitResultsImport(supabase, tenantId, { examId, rows })
 

@@ -21,7 +21,7 @@ export default function ResultsImportWizard({ exams, classes, classIdsByExam }: 
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   function proceedToUpload() {
-    if (!examId || !classId) { setError('Choose an examination and class first.'); return }
+    if (!examId || !classId) { setError('Choose an examination and grade first.'); return }
     setError('')
     setStep('upload')
   }
@@ -104,7 +104,7 @@ export default function ResultsImportWizard({ exams, classes, classIdsByExam }: 
       {step === 'context' && (
         <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6 space-y-4">
           <h2 className="text-base font-bold text-slate-900">1. Choose the academic context</h2>
-          <p className="text-sm text-slate-500">Marks are imported for one examination and one class at a time. The class must already be assigned to the examination.</p>
+          <p className="text-sm text-slate-500">Marks are imported for one examination and one grade at a time. The grade must already be assigned to the examination.</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">Examination</label>
@@ -114,9 +114,9 @@ export default function ResultsImportWizard({ exams, classes, classIdsByExam }: 
               </select>
             </div>
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">Class</label>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">Grade</label>
               <select value={classId} onChange={e => setClassId(e.target.value)} disabled={!examId} className="w-full min-h-11 text-sm border-slate-300 rounded-xl p-2.5 bg-slate-50 border focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600 outline-none disabled:opacity-50 disabled:cursor-not-allowed">
-                <option value="">{!examId ? 'Select an exam first' : scopedClasses.length ? 'Select class' : 'No grades assigned to this assessment'}</option>
+                <option value="">{!examId ? 'Select an exam first' : scopedClasses.length ? 'Select grade' : 'No grades assigned to this assessment'}</option>
                 {scopedClasses.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
@@ -129,7 +129,7 @@ export default function ResultsImportWizard({ exams, classes, classIdsByExam }: 
         <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6 space-y-5">
           <div>
             <h2 className="text-base font-bold text-slate-900">2. Download the template</h2>
-            <p className="text-sm text-slate-500 mt-1">Generated for the selected exam and class — includes each enrolled student and the learning areas assigned to this examination.</p>
+            <p className="text-sm text-slate-500 mt-1">Generated for the selected exam and grade — includes each enrolled student and the learning areas assigned to this examination.</p>
             <a href={templateHref} download className="mt-3 inline-flex items-center gap-2 min-h-11 px-4 py-2.5 rounded-xl border border-slate-300 text-sm font-semibold text-slate-700 hover:bg-slate-50">
               <Download className="h-4 w-4" /> Download CSV template
             </a>
@@ -143,7 +143,7 @@ export default function ResultsImportWizard({ exams, classes, classIdsByExam }: 
               <input ref={fileInputRef} type="file" accept=".csv,text/csv" className="sr-only cursor-pointer" onChange={handleFileChange} disabled={loading} />
             </label>
           </div>
-          <button onClick={() => setStep('context')} className="text-sm font-semibold text-slate-500 hover:text-slate-700">← Change examination or class</button>
+          <button onClick={() => setStep('context')} className="text-sm font-semibold text-slate-500 hover:text-slate-700">← Change examination or grade</button>
         </div>
       )}
 

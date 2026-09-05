@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 import { changePassword } from './actions'
+import PasswordInput from '@/components/PasswordInput'
+import SubmitButton from '@/components/SubmitButton'
 
 export default function ChangePasswordForm() {
   const [busy, setBusy] = useState(false)
@@ -28,12 +30,29 @@ export default function ChangePasswordForm() {
       }}
     >
       <h2 className="section-heading" style={{ margin: 0, fontSize: 18 }}>Change password</h2>
-      <label className="field-label">Current password<input name="current_password" type="password" required autoComplete="current-password" /></label>
-      <label className="field-label">New password<input name="new_password" type="password" required minLength={8} autoComplete="new-password" /></label>
-      <label className="field-label">Confirm new password<input name="confirm_password" type="password" required minLength={8} autoComplete="new-password" /></label>
+      <PasswordInput
+        id="current-password"
+        name="current_password"
+        label="Current password"
+        autoComplete="current-password"
+      />
+      <PasswordInput
+        id="new-password"
+        name="new_password"
+        label="New password"
+        autoComplete="new-password"
+        minLength={8}
+      />
+      <PasswordInput
+        id="confirm-password"
+        name="confirm_password"
+        label="Confirm new password"
+        autoComplete="new-password"
+        minLength={8}
+      />
       {error && <div className="notice error">{error}</div>}
       {message && <div className="notice success" style={{ background: '#ecfdf5', color: '#065f46', border: '1px solid #a7f3d0', borderRadius: 8, padding: '8px 12px' }}>{message}</div>}
-      <button className="btn" disabled={busy} style={{ width: 'max-content' }}>{busy ? 'Saving…' : 'Update password'}</button>
+      <SubmitButton style={{ width: 'max-content' }} disabled={busy}>{busy ? 'Saving…' : 'Update password'}</SubmitButton>
     </form>
   )
 }

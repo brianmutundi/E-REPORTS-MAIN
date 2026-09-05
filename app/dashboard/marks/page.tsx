@@ -1,146 +1,10 @@
-import { revalidatePath } from 'next/cache'
-import { redirect } from 'next/navigation'
 import { getDashboardSession } from '@/lib/supabase/session'
 import { getScopeGrades, getScopeSubjects, getScopeExams, getScopeStreams, verifyScope } from '@/lib/scope'
 import Link from 'next/link'
-import {
-  CheckCircle,
-  AlertCircle,
-  Sliders,
-  Users,
-  UserX,
-  Upload
-} from 'lucide-react'
+import { AlertCircle, Sliders, Users, Upload } from 'lucide-react'
 import SuccessToast from '@/components/SuccessToast'
 import AssessmentFilterForm from '@/components/AssessmentFilterForm'
-import ScoreCellInput from '@/components/ScoreCellInput'
-import SaveMarksButton from '@/components/SaveMarksButton'
-
-async function saveMarks(formData: FormData) {
-  'use server'
-  const { supabase, user, tenantId } = await getDashboardSession()
-  if (!user) return
-
-  const examId = String(formData.get('exam_id') || '')
-  const classId = String(formData.get('class_id') || '')
-  const subjectId = String(formData.get('subject_id') || '')
-
-  if (!tenantId || !examId || !classId || !subjectId) return
-
-  const target = `/dashboard/marks?exam=${examId}&class=${classId}&subject=${subjectId}`
-  const scopeError = `${target}&error=Assign%20this%20grade%20and%20learning%20area%20to%20the%20assessment%20first`
-  const scoreError = `${target}&error=Each%20score%20must%20be%20between%200%20and%20100`
-  const saveError = `${target}&error=Could%20not%20save%20marks`
-
-  const scoped = await verifyScope(supabase, tenantId, examId, classId, subjectId)
-
-  if (!scoped) {
-    redirect(scopeError)
-  }
-
-  const { data: students } = await supabase
-    .from('students')
-    .select('id')
-    .eq('tenant_id', tenantId)
-    .eq('class_id', classId)
-    .order('full_name')
-
-  // Each changed row carries the version it was loaded with
-  // (mark updated_at, or empty when the learner was absent). The atomic RPC
-  // applies each row only when that version still matches, so concurrent saves
-  // of the same grid never silently overwrite each other's work.
-  const studentIds: string[] = []
-  const scores: (number | null)[] = []
-  const baseUpdatedAts: (string | null)[] = []
-
-  for (const student of students ?? []) {
-    const raw = String(formData.get(`score_${student.id}`) ?? '').trim()
-    const base = String(formData.get(`prev_${student.id}`) ?? '').trim() || null
-    if (raw === '') {
-      // Blank = absent. When this learner had no recorded score when the grid
-      // loaded there is nothing to change; clearing an existing score is a real
-      // change and is sent with its loaded version.
-      if (base === null) continue
-      studentIds.push(student.id)
-      scores.push(null)
-      baseUpdatedAts.push(base)
-      continue
-    }
-    const score = Number(raw)
-    if (!Number.isFinite(score) || score < 0 || score > 100) {
-      redirect(scoreError)
-    }
-    studentIds.push(student.id)
-    scores.push(score)
-    baseUpdatedAts.push(base)
-  }
-
-  if (!studentIds.length) redirect(`${target}&saved=1`)
-
-  const { data: applied, error } = await supabase.rpc('save_marks_grid', {
-    p_exam_id: examId,
-    p_subject_id: subjectId,
-    p_class_id: classId,
-    p_student_ids: studentIds,
-    p_scores: scores,
-    p_base_updated_ats: baseUpdatedAts,
-  })
-
-  if (error) {
-    // Pre-migration database: save_marks_grid does not exist yet, so keep the
-    // previous atomic-upsert behaviour (database unique constraint still
-    // prevents duplicates).
-    if (error.code === 'PGRST202' || /cannot find the function|does not exist/i.test(error.message ?? '')) {
-      const rows: { tenant_id: string; exam_id: string; student_id: string; subject_id: string; score: number; updated_at: string }[] = []
-      const blankStudentIds: string[] = []
-      for (const student of students ?? []) {
-        const raw = String(formData.get(`score_${student.id}`) ?? '').trim()
-        const base = String(formData.get(`prev_${student.id}`) ?? '').trim() || null
-        if (raw === '') {
-          if (base !== null) blankStudentIds.push(student.id)
-          continue
-        }
-        const score = Number(raw)
-        rows.push({
-          tenant_id: tenantId,
-          exam_id: examId,
-          student_id: student.id,
-          subject_id: subjectId,
-          score,
-          updated_at: new Date().toISOString()
-        })
-      }
-      if (rows.length) {
-        const { error: upsertError } = await supabase.from('marks').upsert(rows, { onConflict: 'tenant_id,exam_id,student_id,subject_id' })
-        if (upsertError) redirect(saveError)
-      }
-      if (blankStudentIds.length) {
-        const { error: clearError } = await supabase
-          .from('marks')
-          .delete()
-          .eq('tenant_id', tenantId)
-          .eq('exam_id', examId)
-          .eq('subject_id', subjectId)
-          .in('student_id', blankStudentIds)
-        if (clearError) redirect(saveError)
-      }
-      redirect(`${target}&saved=1`)
-    }
-    redirect(saveError)
-  }
-
-  const conflicts = (applied ?? []).filter((r: { student_id: string; status: string }) => r.status === 'conflict').map((r: { student_id: string; status: string }) => r.student_id)
-  if (conflicts.length) {
-    redirect(`${target}&saved=1&conflicts=${conflicts.join(',')}`)
-  }
-
-  revalidatePath('/dashboard/marks')
-  revalidatePath('/dashboard/marks/import')
-  revalidatePath('/dashboard/results')
-  revalidatePath('/dashboard/reports')
-  revalidatePath('/dashboard/analysis')
-  redirect(`${target}&saved=1`)
-}
+import MarksEntryGrid from '@/components/MarksEntryGrid'
 
 export default async function MarksPage({ searchParams }: { searchParams: Promise<{ exam?: string; class?: string; subject?: string; stream?: string; error?: string; saved?: string; conflicts?: string }> }) {
   const params = await searchParams
@@ -213,7 +77,10 @@ export default async function MarksPage({ searchParams }: { searchParams: Promis
     marks = m ?? []
   }
 
-  const scoreMap = new Map(marks.map(m => [m.student_id, { score: m.score, updatedAt: m.updated_at }]))
+  const scoreRecord: Record<string, { score: number; updatedAt: string } | undefined> = {}
+  for (const m of marks) {
+    scoreRecord[m.student_id] = { score: m.score, updatedAt: m.updated_at }
+  }
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
@@ -325,11 +192,7 @@ export default async function MarksPage({ searchParams }: { searchParams: Promis
 
       {/* Marks Entry Card */}
       {params.exam && params.class && params.subject && gradeValid && (
-        <form action={saveMarks} className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-          <input type="hidden" name="exam_id" value={params.exam} />
-          <input type="hidden" name="class_id" value={params.class} />
-          <input type="hidden" name="subject_id" value={params.subject} />
-
+        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
           <div className="p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-slate-50/50">
             <div>
               <h2 className="text-base font-bold text-slate-900">Scores Entry Matrix</h2>
@@ -349,77 +212,16 @@ export default async function MarksPage({ searchParams }: { searchParams: Promis
           )}
 
           {scopeValid && (
-            <div className="table-rail">
-              <table className="w-full text-left text-sm text-slate-600">
-                <thead className="bg-slate-50 border-b border-slate-200 text-[11px] uppercase tracking-wider font-semibold text-slate-500 sticky top-0 z-20">
-                  <tr>
-                    <th scope="col" className="md:sticky md:left-0 z-30 bg-slate-50 px-3 py-3 sm:px-4 sm:py-3.5 lg:px-6 w-14 sm:w-24">Admission No</th>
-                    <th scope="col" className="md:sticky md:left-14 sm:md:left-24 z-30 bg-slate-50 px-3 py-3 sm:px-4 sm:py-3.5 lg:px-6 min-w-0 sm:min-w-56">Student Name</th>
-                    <th scope="col" className="px-3 py-3 sm:px-4 sm:py-3.5 lg:px-6 min-w-28 sm:w-52 text-right">Score (/100)</th>
-                    <th scope="col" className="px-3 py-3 sm:px-4 sm:py-3.5 lg:px-6">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {students.length ? (
-                    students.map((s, i) => {
-                      const existingScore = scoreMap.get(s.id)
-                      const isEntered = existingScore !== undefined
-                      return (
-                        <tr key={s.id} className="group hover:bg-slate-50/80 transition-colors">
-                          <td className="md:sticky md:left-0 z-10 bg-white group-hover:bg-slate-50/80 transition-colors px-3 py-3 sm:px-4 sm:py-4 lg:px-6 font-mono text-xs font-semibold text-slate-700 whitespace-nowrap w-14 sm:w-24">
-                            {s.admission_no}
-                          </td>
-                          <td className="md:sticky md:left-14 sm:md:left-24 z-10 bg-white group-hover:bg-slate-50/80 transition-colors px-3 py-3 sm:px-4 sm:py-4 lg:px-6 font-medium text-slate-900 whitespace-nowrap min-w-0 sm:min-w-56">
-                            {s.full_name}
-                          </td>
-                          <td className="px-3 py-3 sm:px-4 sm:py-4 lg:px-6 min-w-28 sm:min-w-0">
-                            <input
-                              type="hidden"
-                              name={`prev_${s.id}`}
-                              value={existingScore ? existingScore.updatedAt : ''}
-                            />
-                            <ScoreCellInput
-                              name={`score_${s.id}`}
-                              defaultValue={existingScore ? existingScore.score : ''}
-                              index={i}
-                              ariaLabel={`Score for ${s.full_name}`}
-                            />
-                          </td>
-                          <td className="px-3 py-3 sm:px-4 sm:py-4 lg:px-6">
-                            {isEntered ? (
-                              <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200/60 px-2.5 py-0.5 rounded-full">
-                                <CheckCircle className="h-3 w-3" /> Recorded
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-600 bg-slate-50 border border-slate-200 px-2.5 py-0.5 rounded-full">
-                                Pending
-                              </span>
-                            )}
-                          </td>
-                        </tr>
-                      )
-                    })
-                  ) : (
-                    <tr>
-                      <td colSpan={4} className="px-6 py-12 text-center text-slate-500">
-                        <div className="flex flex-col items-center justify-center gap-2">
-                          <UserX className="h-8 w-8 text-slate-300" />
-                          <p className="text-sm font-medium">No learners are available for this grade.</p>
-                        </div>
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+            <MarksEntryGrid
+              examId={params.exam}
+              classId={params.class}
+              subjectId={params.subject}
+              streamParam={params.stream}
+              students={students}
+              scoreMap={scoreRecord}
+            />
           )}
-
-          {scopeValid && students.length > 0 && (
-            <div className="p-4 bg-slate-50/80 border-t border-slate-100 flex justify-end">
-              <SaveMarksButton />
-            </div>
-          )}
-        </form>
+        </div>
       )}
     </div>
   )

@@ -7,6 +7,7 @@ import { toTitleCase } from '@/lib/format-name'
 import { getDashboardSession } from '@/lib/supabase/session'
 import ClassSwitcher from '@/components/ClassSwitcher'
 import { friendlyDbMessage } from '@/lib/db-errors'
+import SubmitButton from '@/components/SubmitButton'
 
 async function getTenantContext() {
   const { supabase, user, tenantId } = await getDashboardSession()
@@ -47,7 +48,7 @@ function getStudentWriteErrorMessage(error: { code?: string; message?: string } 
   // without exposing raw Postgres details.
   const msg = friendlyDbMessage(error)
   if (msg !== 'An unexpected error occurred. Please try again.') return msg
-  if (error.code === '23503') return 'The selected class is no longer available.'
+  if (error.code === '23503') return 'The selected grade is no longer available.'
   return 'The student could not be saved. Please try again.'
 }
 
@@ -89,7 +90,7 @@ async function saveStudent(formData: FormData) {
   if (!classId) {
     redirect(
       `/dashboard/students?error=${encodeURIComponent(
-        id ? 'A student class is required.' : 'Select a class before adding a student.',
+        id ? 'A student grade is required.' : 'Select a grade before adding a student.',
       )}`,
     )
   }
@@ -103,7 +104,7 @@ async function saveStudent(formData: FormData) {
     .eq('tenant_id', tenantId)
     .maybeSingle()
 
-  if (!cls) redirect('/dashboard/students?error=Invalid%20class')
+  if (!cls) redirect('/dashboard/students?error=Invalid%20grade')
 
   let streamId: string | null = null
   if (streamIdRaw) {
@@ -116,7 +117,7 @@ async function saveStudent(formData: FormData) {
 
     if (!stream) redirect('/dashboard/students?error=Invalid%20stream')
     if (stream.class_id !== safeClassId) {
-      redirect(`/dashboard/students?class_id=${encodeURIComponent(safeClassId)}&error=${encodeURIComponent('That stream does not belong to the selected grade/class.')}`)
+      redirect(`/dashboard/students?class_id=${encodeURIComponent(safeClassId)}&error=${encodeURIComponent('That stream does not belong to the selected grade.')}`)
     }
     streamId = stream.id
   }
@@ -297,7 +298,7 @@ export default async function StudentsPage({
           <div className="eyebrow">Student management</div>
           <h1 className="title">Students</h1>
           <p className="muted max-w-2xl">
-            Select a class to manage its roster, import students, or export the class list.
+            Select a grade to manage its roster, import students, or export the grade list.
           </p>
         </div>
 
@@ -317,7 +318,7 @@ export default async function StudentsPage({
                 <Users className="h-4 w-4" />
               </div>
               <div>
-                <h2 className="text-base font-bold text-slate-900">Class overview</h2>
+                <h2 className="text-base font-bold text-slate-900">Grade overview</h2>
                 <p className="muted mt-0.5">Current student counts</p>
               </div>
             </div>
@@ -357,7 +358,7 @@ export default async function StudentsPage({
             })}
           </div>
         ) : (
-          <p className="muted">No classes have been created yet.</p>
+          <p className="muted">No grades have been created yet.</p>
         )}
       </section>
 
@@ -366,7 +367,7 @@ export default async function StudentsPage({
         <section className="card mt-4 overflow-hidden">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <label htmlFor="class_id_switch" className="shrink-0 text-xs font-bold uppercase tracking-wider text-slate-500">
-              Switch class
+              Switch grade
             </label>
             <ClassSwitcher
               classes={(classes ?? []).map((c: ClassRow) => ({ id: c.id, name: c.name }))}
@@ -382,8 +383,8 @@ export default async function StudentsPage({
               <GraduationCap className="h-5 w-5" />
             </div>
             <div className="min-w-0 flex-1">
-              <h2 className="text-sm font-bold text-slate-900">Choose a class</h2>
-              <p className="mt-0.5 text-xs text-slate-500">Only the selected class roster will be displayed.</p>
+              <h2 className="text-sm font-bold text-slate-900">Choose a grade</h2>
+              <p className="mt-0.5 text-xs text-slate-500">Only the selected grade roster will be displayed.</p>
             </div>
           </div>
 
@@ -393,7 +394,7 @@ export default async function StudentsPage({
               defaultValue={selectedClassId ?? ''}
               className="block min-h-12 w-full min-w-0 rounded-xl border border-slate-300 bg-slate-50 px-3 py-3 text-base text-slate-900 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
             >
-              <option value="">Select a class</option>
+              <option value="">Select a grade</option>
               {(classes ?? []).map((c: ClassRow) => (
                 <option key={c.id} value={c.id}>
                   {c.name} — {counts.get(c.id) ?? 0} students
@@ -401,7 +402,7 @@ export default async function StudentsPage({
               ))}
             </select>
             <button className="student-btn w-full sm:w-auto sm:px-6" type="submit">
-              Open class
+              Open grade
             </button>
           </form>
         </section>
@@ -413,7 +414,7 @@ export default async function StudentsPage({
           <section className="card mt-4 overflow-hidden">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="min-w-0">
-                <div className="eyebrow">Selected class</div>
+                <div className="eyebrow">Selected grade</div>
                 <div className="mt-1 flex min-w-0 items-center gap-2">
                   <h2 className="min-w-0 truncate text-xl font-bold text-slate-900">{selectedClass.name}</h2>
                   <span className="shrink-0 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">
@@ -464,7 +465,7 @@ export default async function StudentsPage({
               <div className="mb-4">
                 <div className="eyebrow">Add student</div>
                 <h2 className="mt-1 text-base font-bold text-slate-900">Add student to {selectedClass.name}</h2>
-                <p className="muted mt-1">The selected class is assigned automatically.</p>
+                <p className="muted mt-1">The selected grade is assigned automatically.</p>
               </div>
 
               <form action={saveStudent} className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_1.5fr_auto] lg:items-end">
@@ -486,7 +487,7 @@ export default async function StudentsPage({
                     </select>
                   </label>
                 )}
-                <button className="student-btn w-full lg:w-auto">Add student</button>
+                <SubmitButton className="student-btn w-full lg:w-auto">Add student</SubmitButton>
               </form>
             </section>
           ) : editing ? (
@@ -494,7 +495,7 @@ export default async function StudentsPage({
               <div className="mb-4">
                 <div className="eyebrow">Edit student</div>
                 <h2 className="mt-1 text-base font-bold text-slate-900">Update student details</h2>
-                <p className="muted mt-1">The current class is preserved unless you intentionally choose another class.</p>
+                <p className="muted mt-1">The current grade is preserved unless you intentionally choose another grade.</p>
               </div>
 
               <form action={saveStudent} className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_1.5fr_1fr_1fr_auto_auto] lg:items-end">
@@ -509,7 +510,7 @@ export default async function StudentsPage({
                   <input name="full_name" placeholder="Full name" defaultValue={editing.full_name} required />
                 </label>
                 <label className="field-label">
-                  Class
+                  Grade
                   <select name="class_id" defaultValue={editing.class_id ?? selectedClass.id}>
                     {(classes ?? []).map((c: ClassRow) => (
                       <option key={c.id} value={c.id}>{c.name}</option>
@@ -525,7 +526,7 @@ export default async function StudentsPage({
                     </select>
                   </label>
                 )}
-                <button className="student-btn w-full lg:w-auto">Update</button>
+                <SubmitButton className="student-btn w-full lg:w-auto">Update</SubmitButton>
                 <Link className="student-btn secondary w-full lg:w-auto" href={`/dashboard/students?class_id=${encodeURIComponent(selectedClass.id)}`}>
                   Cancel
                 </Link>
@@ -644,7 +645,7 @@ export default async function StudentsPage({
                   <Users className="h-5 w-5" />
                 </div>
                 <p className="mt-3 text-sm font-semibold text-slate-700">No students in {selectedClass.name} yet.</p>
-                <p className="mt-1 text-xs text-slate-500">Add a student or use Bulk import to populate this class.</p>
+                <p className="mt-1 text-xs text-slate-500">Add a student or use Bulk import to populate this grade.</p>
               </div>
             )}
           </section>
@@ -654,9 +655,9 @@ export default async function StudentsPage({
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
             <Download className="h-5 w-5" />
           </div>
-          <h2 className="mt-3 text-base font-bold text-slate-900">Select a class to continue</h2>
+          <h2 className="mt-3 text-base font-bold text-slate-900">Select a grade to continue</h2>
           <p className="muted mx-auto mt-1 max-w-md">
-            Choose a class above to view its roster. Add, import, and export actions stay scoped to the selected class.
+            Choose a grade above to view its roster. Add, import, and export actions stay scoped to the selected grade.
           </p>
         </section>
       )}

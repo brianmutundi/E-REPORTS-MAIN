@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { getExamResults } from '@/lib/results'
-import { getTenantGradingScale } from '@/lib/grading'
+import { getTenantGradingScale, getGrade } from '@/lib/grading'
 import { getDashboardSession } from '@/lib/supabase/session'
 import { getScopeStreams, getScopeExams, type ScopeStream, type ScopeExam } from '@/lib/scope'
 import CascadingFilterBar from '@/components/CascadingFilterBar'
@@ -82,7 +82,7 @@ export default async function ResultsPage({
           <Link href="/dashboard/marks" className="btn secondary">Marks Entry</Link>
           <Link href="/dashboard/reports" className="btn">
             <FileText className="h-4 w-4" />
-            <span>Report Forms</span>
+            <span>Assessment Reports</span>
           </Link>
         </div>
       </div>
@@ -156,7 +156,7 @@ export default async function ResultsPage({
             <table className="w-full text-left text-sm text-slate-600">
               <thead className="bg-slate-50 border-b border-slate-200 text-[11px] uppercase tracking-wider font-semibold text-slate-500">
                 <tr>
-                  <th className="px-5 py-3">Subject / Area</th>
+                  <th className="px-5 py-3">Learning Area</th>
                   <th className="px-5 py-3 text-right">Raw Score</th>
                   <th className="px-5 py-3 text-center">Grade</th>
                 </tr>
@@ -164,7 +164,7 @@ export default async function ResultsPage({
               <tbody className="divide-y divide-slate-100">
                 {selected.subjects.map((s) => {
                   const subjectGrade = selected.complete
-                    ? (scale.find(r => s.score >= r.min && s.score <= r.max)?.grade ?? 'E')
+                    ? (getGrade(s.score, scale) || '—')
                     : '—'
 
                   return (

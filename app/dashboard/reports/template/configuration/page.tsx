@@ -6,6 +6,7 @@ import { normalizeAssessmentComponents, normalizeReportTemplate } from '@/lib/re
 import AssessmentComponentsEditor from './AssessmentComponentsEditor'
 import SuccessToast from '@/components/SuccessToast'
 import { friendlyDbRedirect } from '@/lib/db-errors'
+import SubmitButton from '@/components/SubmitButton'
 
 const DEFAULT_TEACHER_REMARKS = ['Excellent progress', 'Very good progress', 'Good progress', 'Needs improvement']
 const DEFAULT_PRINCIPAL_REMARKS = ['Promoted to the next level', 'Keep up the good work', 'Continue working hard', 'Needs closer support']
@@ -22,7 +23,7 @@ async function saveConfiguration(formData: FormData) {
 
   const teacherRemarks = rowsFromForm(formData, 'teacher')
   const principalRemarks = rowsFromForm(formData, 'principal')
-  if (teacherRemarks.length < 4 || teacherRemarks.length > 8) redirect('/dashboard/reports/template/configuration?error=' + encodeURIComponent('Error|Class teacher remarks must contain 4 to 8 rows.'))
+  if (teacherRemarks.length < 4 || teacherRemarks.length > 8) redirect('/dashboard/reports/template/configuration?error=' + encodeURIComponent('Error|Grade class teacher remarks must contain 4 to 8 rows.'))
   if (principalRemarks.length < 4 || principalRemarks.length > 8) redirect('/dashboard/reports/template/configuration?error=' + encodeURIComponent('Error|Principal remarks must contain 4 to 8 rows.'))
 
   const assessmentComponents = {
@@ -115,11 +116,11 @@ export default async function ReportTemplateConfigurationPage({ searchParams }: 
         <AssessmentComponentsEditor initial={assessmentComponents} />
 
         <h2 style={{ marginTop: 28 }}>Remarks</h2><p className="muted">Each enabled remark list must contain between 4 and 8 options.</p>
-        <label className="toggle-row"><span>Enable class teacher remarks</span><input type="checkbox" name="teacher_enabled" defaultChecked={config?.teacher_remarks_enabled ?? true}/></label>
+        <label className="toggle-row"><span>Enable grade class teacher remarks</span><input type="checkbox" name="teacher_enabled" defaultChecked={config?.teacher_remarks_enabled ?? true}/></label>
         <div className="table">{Array.from({ length: 8 }, (_, i) => <div className="row" key={`teacher-${i}`}><span>{i + 1}</span><input name={`teacher_${i}`} defaultValue={teacherRows[i] ?? ''} placeholder={i < 4 ? 'Required remark' : 'Optional remark'}/></div>)}</div>
         <label className="toggle-row" style={{ marginTop: 20 }}><span>Enable principal remarks</span><input type="checkbox" name="principal_enabled" defaultChecked={config?.principal_remarks_enabled ?? true}/></label>
         <div className="table">{Array.from({ length: 8 }, (_, i) => <div className="row" key={`principal-${i}`}><span>{i + 1}</span><input name={`principal_${i}`} defaultValue={principalRows[i] ?? ''} placeholder={i < 4 ? 'Required remark' : 'Optional remark'}/></div>)}</div>
-        <div style={{ display: 'flex', gap: 10, marginTop: 20, flexWrap: 'wrap' }}><button className="btn">Save configuration</button><Link className="btn secondary" href="/dashboard/grading">Configure grading levels</Link></div>
+        <div style={{ display: 'flex', gap: 10, marginTop: 20, flexWrap: 'wrap' }}><SubmitButton>Save configuration</SubmitButton><Link className="btn secondary" href="/dashboard/grading">Configure grading levels</Link></div>
       </section>
     </form>
   </main>

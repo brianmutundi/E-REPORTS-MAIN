@@ -31,7 +31,7 @@ export default function ForgotPassword() {
   }
 
   return (
-    <main className="main" style={{ maxWidth: 460, margin: '0 auto', paddingTop: 56 }}>
+    <main id="main-content" className="main" style={{ maxWidth: 460, margin: '0 auto', paddingTop: 56 }}>
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 22 }}>
           <img src="/e-reports-app-icon.svg" alt="E-REPORTS" width={100} height={100} style={{ width: 100, height: 100, objectFit: 'contain' }} />

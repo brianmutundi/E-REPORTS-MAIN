@@ -37,7 +37,7 @@ export default function AnalysisExplorer({ analysis, streamId }: { analysis: Ass
               <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">{scope.schoolName}</h2>
               <p className="text-xs text-slate-500 mt-0.5">
                 {scope.schoolAddress ? `P.O. Box ${scope.schoolAddress}` : ''}
-                {scope.classTeacherName ? <span className="ml-1">· Class Teacher: {scope.classTeacherName}</span> : null}
+                {scope.classTeacherName ? <span className="ml-1">· Grade Class Teacher: {scope.classTeacherName}</span> : null}
               </p>
             </div>
           </div>
@@ -54,7 +54,7 @@ export default function AnalysisExplorer({ analysis, streamId }: { analysis: Ass
       {/* KPI band */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard label="Learners Assessed" value={`${analysis.assessedCount} of ${analysis.enrolledCount}`} sub="enrolled in scope" accent="#15803d" />
-        <KpiCard label="Class Mean" value={`${f1(analysis.classMeanPercentage)}%`} sub={`of ${analysis.assessedCount} assessed`} accent="#2563eb" />
+        <KpiCard label="Grade Mean" value={`${f1(analysis.classMeanPercentage)}%`} sub={`of ${analysis.assessedCount} assessed`} accent="#2563eb" />
         <KpiCard label="Top Learner" value={analysis.topLearner?.name ?? '—'} sub={analysis.topLearner ? `${analysis.topLearner.total} · ${f1(analysis.topLearner.percentage)}%` : undefined} accent="#d97706" />
         <KpiCard label="Learning Areas" value={`${analysis.learningAreas.length}`} sub={`max total ${analysis.maxTotal}`} accent="#7c3aed" />
       </div>
@@ -74,7 +74,7 @@ export default function AnalysisExplorer({ analysis, streamId }: { analysis: Ass
           <CbcDonut levels={analysis.performanceDistribution} />
         </section>
         <section className="rounded-2xl bg-white border border-slate-200/80 shadow-sm p-5">
-          <h4 className="text-sm font-bold text-slate-900 mb-4 flex items-center gap-2"><BarChart3 className="h-4 w-4 text-emerald-600" /> Class Statistics</h4>
+          <h4 className="text-sm font-bold text-slate-900 mb-4 flex items-center gap-2"><BarChart3 className="h-4 w-4 text-emerald-600" /> Grade Statistics</h4>
           <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
             <Stat label="Mean %" value={`${f1(analysis.classMeanPercentage)}%`} />
             <Stat label="Median %" value={`${f1(analysis.medianPercentage)}%`} />

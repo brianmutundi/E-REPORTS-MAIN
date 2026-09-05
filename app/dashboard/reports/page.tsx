@@ -68,7 +68,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const scoreHeader = (label: string) => (singleScoreColumn ? 'Score' : label)
 
   return <main className="main" style={{ maxWidth: 1120, margin: '0 auto' }}>
-    <div className="top no-print"><div><div className="eyebrow">Report forms</div><h1 className="title">Student Report Forms</h1><p className="muted">Select an examination and class to view the configured report form.</p></div><div className="actions" style={{ marginTop: 0 }}><Link className="btn secondary" href="/dashboard/reports/template">Template</Link><Link className="btn secondary" href="/dashboard/results">Results</Link></div></div>
+    <div className="top no-print"><div><div className="eyebrow">Assessment reports</div><h1 className="title">Student Assessment Reports</h1><p className="muted">Select an examination and grade to view the configured report form.</p></div><div className="actions" style={{ marginTop: 0 }}><Link className="btn secondary" href="/dashboard/reports/template">Template</Link><Link className="btn secondary" href="/dashboard/results">Results</Link></div></div>
 
     <div className="card no-print">
       <CascadingFilterBar
@@ -110,10 +110,10 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
     {hasSelection && !configured?.error && (
       <section className="card no-print" style={{ marginTop: 20 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, flexWrap: 'wrap', marginBottom: 16 }}>
-          <div><div className="eyebrow">{exam?.name ?? 'Examination'}</div><h2 style={{ margin: '4px 0', fontSize: 20 }}>{className ?? 'Class'} — Student Reports</h2><p className="muted">{results.length} student{results.length === 1 ? '' : 's'} found. Configured: {template.assessmentComponents.midTerm ? 'Mid Term ' : ''}{template.assessmentComponents.endTerm ? 'End Term ' : ''}{template.assessmentComponents.average ? 'Score' : ''}</p></div>
-          {results.length > 0 && <a className="btn" href={batchHref} download>{hasStreams ? 'Generate Batch PDF' : 'Generate Class PDF'}</a>}
+          <div><div className="eyebrow">{exam?.name ?? 'Examination'}</div><h2 style={{ margin: '4px 0', fontSize: 20 }}>{className ?? 'Grade'} — Student Reports</h2><p className="muted">{results.length} student{results.length === 1 ? '' : 's'} found. Configured: {template.assessmentComponents.midTerm ? 'Mid Term ' : ''}{template.assessmentComponents.endTerm ? 'End Term ' : ''}{template.assessmentComponents.average ? 'Score' : ''}</p></div>
+          {results.length > 0 && <a className="btn" href={batchHref} download>{hasStreams ? 'Generate Batch PDF' : 'Generate Grade PDF'}</a>}
         </div>
-                    {results.length === 0 ? <div className="notice error">No students were found in the selected class.</div> : <div style={{ display: 'grid', gap: 10 }}>{results.map(student => <div key={student.studentId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '14px 16px', border: '1px solid #e2e8f0', borderRadius: 12, background: params.student === student.studentId ? '#f8fafc' : 'white', flexWrap: 'wrap' }}><div style={{ minWidth: 0, flex: '1 1 250px' }}><div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', fontFamily: 'monospace' }}>{student.admissionNo}</div><div style={{ fontWeight: 700, color: '#0f172a', marginTop: 3 }}>{student.fullName}</div></div><div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}><span style={{ display: 'inline-flex', alignItems: 'center', padding: '5px 9px', borderRadius: 999, fontSize: 12, fontWeight: 700, background: student.complete ? '#ecfdf5' : '#fff7ed', color: student.complete ? '#047857' : '#c2410c' }}>{student.complete ? 'Complete' : 'Incomplete'}</span><Link className="btn secondary" href={`/dashboard/reports?exam=${params.exam}&class=${params.class}${params.stream ? `&stream=${params.stream}` : ''}&student=${student.studentId}`}>View Report</Link></div></div>)}</div>}
+                    {results.length === 0 ? <div className="notice error">No students were found in the selected grade.</div> : <div style={{ display: 'grid', gap: 10 }}>{results.map(student => <div key={student.studentId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '14px 16px', border: '1px solid #e2e8f0', borderRadius: 12, background: params.student === student.studentId ? '#f8fafc' : 'white', flexWrap: 'wrap' }}><div style={{ minWidth: 0, flex: '1 1 250px' }}><div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', fontFamily: 'monospace' }}>{student.admissionNo}</div><div style={{ fontWeight: 700, color: '#0f172a', marginTop: 3 }}>{student.fullName}</div></div><div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}><span style={{ display: 'inline-flex', alignItems: 'center', padding: '5px 9px', borderRadius: 999, fontSize: 12, fontWeight: 700, background: student.complete ? '#ecfdf5' : '#fff7ed', color: student.complete ? '#047857' : '#c2410c' }}>{student.complete ? 'Complete' : 'Incomplete'}</span><Link className="btn secondary" href={`/dashboard/reports?exam=${params.exam}&class=${params.class}${params.stream ? `&stream=${params.stream}` : ''}&student=${student.studentId}`}>View Report</Link></div></div>)}</div>}
       </section>
     )}
 
@@ -134,10 +134,8 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
         <div className="student-meta">
           {template.student.name && <div><strong>Student</strong><br />{selected.fullName}</div>}
           {template.student.admissionNo && <div><strong>Admission No.</strong><br />{selected.admissionNo}</div>}
-          {template.student.className && <div><strong>Class</strong><br />{className ?? '—'}</div>}
+          {template.student.className && <div><strong>Grade</strong><br />{className ?? '—'}</div>}
           {selected.streamName ? <div><strong>Stream</strong><br />{selected.streamName}</div> : null}
-          {template.results.position && <div><strong>Grade Position</strong><br />{selected.complete ? selected.position : '—'}</div>}
-          {template.results.position && selected.streamPosition !== null && <div><strong>Stream Position</strong><br />{selected.streamPosition}</div>}
         </div>
 
         {template.results.grade && gradingScale.length > 0 && (
@@ -173,7 +171,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
         <table className="report-table">
           <thead>
             <tr>
-              {template.results.learningArea && <th>Learning Area / Subject</th>}
+              {template.results.learningArea && <th>Learning Area</th>}
               {template.assessmentComponents.midTerm && <th>{scoreHeader('Mid Term')}</th>}
               {template.assessmentComponents.endTerm && <th>{scoreHeader('End Term')}</th>}
               {template.assessmentComponents.average && <th>{scoreHeader('Score')}</th>}
@@ -193,15 +191,13 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
               </tr>
             ))}
           </tbody>
-          {(template.results.total || template.results.average || template.results.position || template.results.grade) && (() => {
+          {(template.results.total || template.results.average || template.results.grade) && (() => {
             const span = Math.max(1, (template.assessmentComponents.midTerm ? 1 : 0) + (template.assessmentComponents.endTerm ? 1 : 0) + (template.assessmentComponents.average ? 1 : 0) + (template.results.grade ? 1 : 0) + (template.results.gradeDescription ? 1 : 0))
             return (
               <tfoot>
                 {template.results.total && (template.assessmentComponents.midTerm || template.assessmentComponents.endTerm || template.assessmentComponents.average) && <tr><th>Total</th><th colSpan={span}>{selected.total === null ? '—' : `${selected.total}`}</th></tr>}
                 {template.results.average && template.assessmentComponents.average && <tr><th>Average</th><th colSpan={span}>{selected.average === null ? '—' : selected.average.toFixed(2)}</th></tr>}
                 {template.results.grade && selected.overallLevel && <tr><th>Overall Performance Level</th><th colSpan={span}>{selected.overallLevel}{selected.overallDescription ? ` — ${selected.overallDescription}` : ''}</th></tr>}
-                {template.results.position && <tr><th>Grade Position</th><th colSpan={span}>{selected.complete ? selected.position : '—'}</th></tr>}
-                {template.results.position && selected.streamPosition !== null && <tr><th>Stream Position</th><th colSpan={span}>{selected.streamPosition}</th></tr>}
               </tfoot>
             )
           })()}
@@ -221,7 +217,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
 
         {template.additional.teacherComment && (
           <div className="preview-note report-remark">
-            <b>Remark (Class teacher)</b>
+            <b>Remark (Grade Class Teacher)</b>
             <p className="remark-text">{remarkForLevel(selected.overallLevel, gradingScale, teacherRemarks) || '____________________________'}</p>
           </div>
         )}
@@ -233,7 +229,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
         )}
         {template.additional.signatureArea && (
           <div className="signature-block">
-            <div className="signature-row"><span>Class Teacher&apos;s Name: {classTeacherName || '________________'}</span><span>Sign: ____________</span><span>Date: ____________</span></div>
+            <div className="signature-row"><span>Grade Class Teacher&apos;s Name: {classTeacherName || '________________'}</span><span>Sign: ____________</span><span>Date: ____________</span></div>
             <div className="signature-row"><span>Principal&apos;s Name: {classPrincipalName || '________________'}</span><span>Sign: ____________</span><span>Date: ____________</span></div>
           </div>
         )}

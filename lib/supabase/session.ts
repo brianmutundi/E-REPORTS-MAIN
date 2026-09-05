@@ -28,10 +28,19 @@ export const getDashboardSession = cache(
       .eq('id', user.id)
       .maybeSingle()
 
+    let tenantId = profile?.tenant_id ?? null
+    // A deactivated school must not continue to access its data. Only
+    // administrators carry a tenant_id, so gate the whole school's data plane
+    // here and let every page's existing "No school is linked" guard handle it.
+    if (tenantId && profile?.role === 'admin') {
+      const { data: tenant } = await supabase.from('tenants').select('status').eq('id', tenantId).maybeSingle()
+      if (tenant && tenant.status === 'inactive') tenantId = null
+    }
+
     return {
       supabase,
       user,
-      tenantId: profile?.tenant_id ?? null,
+      tenantId,
       fullName: profile?.full_name?.trim() || null,
       role: profile?.role ?? null,
     }

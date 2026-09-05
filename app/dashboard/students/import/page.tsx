@@ -7,7 +7,7 @@ type SearchParams = { class_id?: string }
 export default async function StudentImportPage({ searchParams }: { searchParams: Promise<SearchParams> }) {
   const params = await searchParams
   const classId = String(params.class_id || '').trim()
-  if (!classId) redirect('/dashboard/students?error=Select%20a%20class%20before%20starting%20a%20bulk%20import')
+  if (!classId) redirect('/dashboard/students?error=Select%20a%20grade%20before%20starting%20a%20bulk%20import')
 
   const { supabase, user, tenantId } = await getDashboardSession()
   if (!user) redirect('/login')
@@ -20,7 +20,7 @@ export default async function StudentImportPage({ searchParams }: { searchParams
     .eq('tenant_id', tenantId)
     .maybeSingle()
 
-  if (!selectedClass) redirect('/dashboard/students?error=Invalid%20class%20selection')
+  if (!selectedClass) redirect('/dashboard/students?error=Invalid%20grade%20selection')
 
   return <StudentImportWizard classId={selectedClass.id} className={selectedClass.name} />
 }

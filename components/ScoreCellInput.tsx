@@ -9,6 +9,8 @@ interface ScoreCellInputProps {
   index: number
   /** Label for assistive tech, e.g. "Score for Jane Wanjiku". */
   ariaLabel: string
+  /** Fired on every keystroke, e.g. for unsaved-changes tracking. */
+  onChange?: React.ChangeEventHandler<HTMLInputElement>
 }
 
 /**
@@ -19,7 +21,7 @@ interface ScoreCellInputProps {
  * - the default/value is unchanged from the server form, so the save action
  *   keeps reading exactly what it did before.
  */
-export default function ScoreCellInput({ name, defaultValue, index, ariaLabel }: ScoreCellInputProps) {
+export default function ScoreCellInput({ name, defaultValue, index, ariaLabel, onChange }: ScoreCellInputProps) {
   const ref = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -53,6 +55,7 @@ export default function ScoreCellInput({ name, defaultValue, index, ariaLabel }:
       defaultValue={defaultValue}
       placeholder="blank = absent"
       aria-label={ariaLabel}
+      onChange={onChange}
       onFocus={(e) => e.target.select()}
       className="input-score-cell num w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
     />

@@ -53,7 +53,7 @@ export default async function DashboardPage() {
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4 lg:gap-4">
         {[
           { label: 'Students', value: students ?? 0, icon: Users },
-          { label: 'Classes', value: classes ?? 0, icon: GraduationCap },
+          { label: 'Grades', value: classes ?? 0, icon: GraduationCap },
           { label: 'Learning Areas', value: subjects ?? 0, icon: BookOpen },
           { label: 'Examinations', value: exams ?? 0, icon: ClipboardList },
         ].map(({ label, value, icon: Icon }) => (

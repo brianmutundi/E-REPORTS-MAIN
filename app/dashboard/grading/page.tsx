@@ -6,6 +6,7 @@ import SuccessToast from '@/components/SuccessToast'
 import { friendlyDbRedirect } from '@/lib/db-errors'
 import { knecDefaultLevels, type GradingMode, type GradeRule } from '@/lib/grading'
 import GradingModeChooser from '@/components/grading/GradingModeChooser'
+import SubmitButton from '@/components/SubmitButton'
 
 const VALID_CODES_8 = ['EE1', 'EE2', 'ME1', 'ME2', 'AE1', 'AE2', 'BE1', 'BE2']
 const VALID_CODES_4 = ['EE', 'ME', 'AE', 'BE']
@@ -296,7 +297,7 @@ export default async function GradingPage({ searchParams }: { searchParams: Prom
           Ranges must fully cover 0–100 with no overlaps or gaps. Each value maps to exactly one level.
         </p>
         <div className="actions-inline" style={{ marginTop: 16 }}>
-          <button className="btn" type="submit" name="intent" value="save">Save Grading Configuration</button>
+          <SubmitButton name="intent" value="save">Save Grading Configuration</SubmitButton>
         </div>
       </form>
     </main>

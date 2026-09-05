@@ -393,6 +393,45 @@
   }
 
   @media print {
+    /* Hide application chrome while printing any dashboard page. Each screen's
+       own .no-print callers keep hiding specific controls; these rules catch the
+       global shell (mobile top bar, sidebar drawer, overlays, toasts). */
+    header,
+    aside,
+    .back-to-top,
+    .success-toast,
+    [data-toast-root] {
+      display: none !important;
+    }
+
+    /* Make the sticky-header scroll regions fully visible so wide tables print
+       across pages instead of being clipped to one virtual screen. */
+    .table-rail {
+      max-height: none !important;
+      overflow: visible !important;
+    }
+    .table-rail thead,
+    .table-rail thead * {
+      position: static !important;
+    }
+    .table-rail [class*="sticky"] {
+      position: static !important;
+    }
+
+    /* Repeat table headers on every printed page and keep rows intact. */
+    table {
+      break-inside: auto;
+    }
+    thead {
+      display: table-header-group;
+    }
+    tr,
+    .financial-information,
+    .report {
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+
     .no-print {
       display: none !important;
     }

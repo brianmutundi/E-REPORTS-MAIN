@@ -71,7 +71,7 @@ export async function GET(request: NextRequest) {
     .eq('tenant_id', profile.tenant_id)
     .eq('class_id', cls.id)
     .order('full_name')
-  if (error) return new Response('Could not load the selected class roster.', { status: 500 })
+  if (error) return new Response('Could not load the selected grade roster.', { status: 500 })
 
   const pdf = await renderToBuffer(<StudentRosterPdf schoolName={tenant?.name ?? 'School'} className={cls.name} count={students?.length ?? 0} students={students ?? []} />)
   const safeClass = cls.name.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase() || 'class'

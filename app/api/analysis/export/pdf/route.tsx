@@ -383,7 +383,7 @@ function AnalysisPdf({ model }: { model: AssessmentAnalysisModel }) {
           <Text style={styles.title}>ASSESSMENT ANALYSIS</Text>
           <Text style={styles.subtitle}>{subtitle}</Text>
           <Text style={{ ...styles.subtitle, fontSize: 11, fontFamily: F.roman, color: COLORS.muted, marginTop: 2 }}>{streamLine}</Text>
-          {scope.classTeacherName ? <Text style={{ fontSize: 10, color: COLORS.muted, textAlign: 'center', marginTop: 3 }}>Class Teacher: {scope.classTeacherName}</Text> : null}
+          {scope.classTeacherName ? <Text style={{ fontSize: 10, color: COLORS.muted, textAlign: 'center', marginTop: 3 }}>Grade Class Teacher: {scope.classTeacherName}</Text> : null}
         </View>
 
         {/* KPI band */}
@@ -419,7 +419,7 @@ function AnalysisPdf({ model }: { model: AssessmentAnalysisModel }) {
         ) : null}
 
         {/* Distribution + Class statistics */}
-        <SectionTitle>Performance Level Distribution &amp; Class Statistics</SectionTitle>
+        <SectionTitle>Performance Level Distribution &amp; Grade Statistics</SectionTitle>
         <View style={{ flexDirection: 'row', marginHorizontal: -5 }}>
           <View style={{ flex: 1, marginHorizontal: 5 }}>
             <DoughnutSvg levels={performanceDistribution} />

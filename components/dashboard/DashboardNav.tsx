@@ -42,7 +42,7 @@ const navGroups = [
       { name: 'Marks Entry', href: '/dashboard/marks', icon: ListChecks },
       { name: 'Results', href: '/dashboard/results', icon: FileText },
       { name: 'Analysis', href: '/dashboard/analysis', icon: BarChart3 },
-      { name: 'Report Forms', href: '/dashboard/reports', icon: Award },
+      { name: 'Assessment Reports', href: '/dashboard/reports', icon: Award },
       { name: 'Grading', href: '/dashboard/grading', icon: Settings2 },
     ],
   },

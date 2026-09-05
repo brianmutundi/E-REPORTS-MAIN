@@ -65,7 +65,7 @@ export const templateFields: { section: keyof Omit<ReportTemplate, 'assessmentCo
   { section: 'school', key: 'contact', label: 'School contact details (P.O Box / address)' },
   { section: 'student', key: 'name', label: 'Student name' },
   { section: 'student', key: 'admissionNo', label: 'Admission number' },
-  { section: 'student', key: 'className', label: 'Class' },
+  { section: 'student', key: 'className', label: 'Grade' },
   { section: 'student', key: 'stream', label: 'Stream' },
   { section: 'examination', key: 'name', label: 'Examination name' },
   { section: 'examination', key: 'academicYear', label: 'Academic year' },
@@ -75,8 +75,8 @@ export const templateFields: { section: keyof Omit<ReportTemplate, 'assessmentCo
   { section: 'results', key: 'gradeDescription', label: 'Grade description' },
   { section: 'results', key: 'total', label: 'Total' },
   { section: 'results', key: 'average', label: 'Average / mean' },
-  { section: 'additional', key: 'teacherComment', label: 'Class teacher remark' },
-  { section: 'additional', key: 'overallComment', label: 'Head teacher remark' },
+  { section: 'additional', key: 'teacherComment', label: 'Grade class teacher remark' },
+  { section: 'additional', key: 'overallComment', label: 'Principal remark' },
   { section: 'additional', key: 'signatureArea', label: 'Signature area' },
 ]
 

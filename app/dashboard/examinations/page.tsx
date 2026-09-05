@@ -6,6 +6,7 @@ import SuccessToast from '@/components/SuccessToast'
 import EmptyState from '@/components/EmptyState'
 import { ClipboardList } from 'lucide-react'
 import { friendlyDbRedirect } from '@/lib/db-errors'
+import SubmitButton from '@/components/SubmitButton'
 
 const ASSESSMENT_COMPONENTS = ['test_exam', 'mid_term', 'end_term'] as const
 
@@ -34,7 +35,12 @@ async function createExam(formData: FormData) {
   }
 
   const term = String(formData.get('term') || '').trim() || null
-  const academic_year = Number(formData.get('academic_year')) || null
+  const academic_year_raw = Number(formData.get('academic_year'))
+  const academic_year = Number.isNaN(academic_year_raw) ? null : academic_year_raw
+
+  if (academic_year !== null && (!Number.isInteger(academic_year) || academic_year < 2000 || academic_year > 2100)) {
+    redirect('/dashboard/examinations?error=Invalid%20academic%20year')
+  }
 
   const rawComponent = String(
     formData.get('assessment_component') || ''
@@ -148,7 +154,7 @@ const params = await searchParams
           <div className="eyebrow">Assessment management</div>
           <h1 className="title">Assessments</h1>
           <p className="muted">
-            Create examinations, then assign classes and learning areas
+            Create examinations, then assign grades and learning areas
             to each.
           </p>
         </div>
@@ -225,9 +231,9 @@ const params = await searchParams
             </select>
           </label>
 
-          <button className="btn">
+          <SubmitButton>
             Create examination
-          </button>
+          </SubmitButton>
         </form>
       </div>
 

@@ -5,6 +5,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { checkString, checkEmail, checkPassword, checkId } from '@/lib/validation'
+import { friendlyDbMessage } from '@/lib/db-errors'
 
 async function requireSuperAdmin() {
   const supabase = await createClient()
@@ -38,7 +39,7 @@ export async function createTenant(formData: FormData) {
   const admin = createAdminClient()
   const { error } = await admin.from('tenants').insert({ name: name.value, code: code.value, status: 'active' })
 
-  if (error) throw new Error(error.message)
+  if (error) throw new Error(friendlyDbMessage(error))
 
   revalidatePath('/super-admin/dashboard')
 }
@@ -61,7 +62,7 @@ export async function toggleTenantStatus(tenantId: string, currentStatus: string
     .update({ status: newStatus })
     .eq('id', id.value)
 
-  if (error) throw new Error(error.message)
+  if (error) throw new Error(friendlyDbMessage(error))
 
   revalidatePath('/super-admin/dashboard')
 }
@@ -97,7 +98,7 @@ export async function deleteTenant(tenantId: string) {
     .delete()
     .eq('id', id.value)
 
-  if (error) throw new Error(error.message)
+  if (error) throw new Error(friendlyDbMessage(error))
 
   revalidatePath('/super-admin/dashboard')
 }
@@ -143,7 +144,7 @@ export async function createAdmin(formData: FormData) {
 
   if (profileError) {
     await admin.auth.admin.deleteUser(authData.user.id)
-    throw new Error(profileError.message)
+    throw new Error(friendlyDbMessage(profileError))
   }
 
   revalidatePath('/super-admin/dashboard')

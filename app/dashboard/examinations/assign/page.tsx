@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { revalidatePath } from 'next/cache'
 import { getDashboardSession } from '@/lib/supabase/session'
+import SubmitButton from '@/components/SubmitButton'
 
 const EMPTY_UUID = '00000000-0000-0000-0000-000000000000'
 
@@ -170,7 +171,7 @@ export default async function AssignPage({ searchParams }: { searchParams: Promi
             </section>
           )}
 
-          <button className="btn" style={{ marginTop: 20 }}>Save examination scope</button>
+          <SubmitButton style={{ marginTop: 20 }}>Save examination scope</SubmitButton>
         </form>
       )}
     </main>

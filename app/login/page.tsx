@@ -34,7 +34,7 @@ export default function Login() {
     router.replace(profile.role === 'super_admin' ? '/super-admin/dashboard' : '/dashboard')
   }
   return (
-    <main className="min-h-[100svh] bg-slate-950 px-4 py-6 sm:px-6 sm:py-10 flex items-center justify-center overflow-x-hidden">
+    <main id="main-content" className="min-h-[100svh] bg-slate-950 px-4 py-6 sm:px-6 sm:py-10 flex items-center justify-center overflow-x-hidden">
       <div className="w-full max-w-md">
         <div className="text-center mb-6 sm:mb-8">
           <div className="text-2xl sm:text-3xl font-black tracking-tight text-white"><span className="text-emerald-400">E-</span>REPORTS</div>
