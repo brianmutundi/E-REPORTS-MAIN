@@ -1,6 +1,7 @@
 import { getDashboardSession } from '@/lib/supabase/session'
 import { computeTotal, computeTotalMaximum, getGrade, getTotalLevel, getTotalDescription, getTenantGradingScale, getTenantTotalGradingScale, calculateAchievement, type GradeRule } from './grading'
 import { getScopeSubjects } from './scope'
+import { parseTermReference } from './terms'
 import type { AssessmentComponents } from './report-template'
 
 export type ResultColumn = { subjectId: string; subjectName: string; subjectCode: string | null }
@@ -87,9 +88,6 @@ export async function getExamResults(examId: string, classId: string, streamId?:
     const total = computeTotal(subjects.map(s => s.score))
     const average = subjects.length ? total / subjects.length : 0
     const complete = expectedSubjects > 0 && subjects.length >= expectedSubjects
-    // The overall level is normalised against the learner's ASSESSED learning
-    // areas only, so missing (blank) scores never depress the overall level —
-    // and when the learner is complete this equals expectedSubjects exactly.
     const rowTotalMaximum = subjects.length * 100
     return { studentId: student.id, admissionNo: student.admission_no, fullName: student.full_name, streamId: student.stream_id ?? null, streamName: student.stream_id ? (streamNames.get(student.stream_id) ?? null) : null, total, average, grade: complete ? getGrade(average, scale) : '', overallLevel: getTotalLevel(total, rowTotalMaximum, totalScale, scale), overallDescription: getTotalDescription(total, rowTotalMaximum, totalScale, scale), complete, expectedSubjects, subjects }
   })
@@ -104,11 +102,6 @@ export type BroadsheetExportData = {
   columns: ResultColumn[]
 }
 
-/**
- * Loads everything a formal broadsheet needs — school details, the
- * examination and class context, and the scoring matrix — and verifies
- * the exam/class are linked and belong to the caller's tenant.
- */
 export async function getBroadsheetExportData(examId: string, classId: string, streamId?: string): Promise<BroadsheetExportData | null> {
   const { supabase, user, tenantId } = await getDashboardSession()
   if (!user) return null
@@ -135,16 +128,32 @@ async function getExamContext(supabase: Awaited<ReturnType<typeof import('@/lib/
 }
 
 /**
- * Older examinations may predate assessment_component and therefore have a
- * null component. Infer the component from the examination name only for
- * those legacy rows; explicit database values always take precedence.
+ * Resolve the assessment component from the database value and examination
+ * name. If legacy/corrupted metadata disagrees with an explicit End Term/Mid
+ * Term name, the human-readable exam name wins so existing examinations do
+ * not disappear from report configuration.
  */
 function inferAssessmentComponent(name: string, component: string | null): 'mid_term' | 'end_term' | null {
-  if (component === 'mid_term' || component === 'end_term') return component
   const normalized = name.trim().toLowerCase().replace(/[-_]+/g, ' ')
-  if (/\bmid(?:\s+term)?\b|\bmidterm\b/.test(normalized)) return 'mid_term'
-  if (/\bend(?:\s+term)?\b|\bendterm\b/.test(normalized)) return 'end_term'
+  const namedComponent = /\bend(?:\s+term)?\b|\bendterm\b/.test(normalized)
+    ? 'end_term'
+    : /\bmid(?:\s+term)?\b|\bmidterm\b/.test(normalized)
+      ? 'mid_term'
+      : null
+  if (namedComponent) return namedComponent
+  if (component === 'mid_term' || component === 'end_term') return component
   return null
+}
+
+function sameAcademicTerm(
+  a: { term: string | null; academic_year: number | null },
+  b: { term: string | null; academic_year: number | null },
+): boolean {
+  if (a.academic_year !== b.academic_year) return false
+  const parsedA = parseTermReference({ term: a.term, academicYear: a.academic_year })
+  const parsedB = parseTermReference({ term: b.term, academicYear: b.academic_year })
+  if (parsedA && parsedB) return parsedA.year === parsedB.year && parsedA.termNumber === parsedB.termNumber
+  return (a.term ?? '').trim().toLowerCase().replace(/\s+/g, ' ') === (b.term ?? '').trim().toLowerCase().replace(/\s+/g, ' ')
 }
 
 export async function getConfiguredAssessmentResults(
@@ -166,14 +175,11 @@ export async function getConfiguredAssessmentResults(
   const needsMid = components.midTerm && !midExamId
   const needsEnd = components.endTerm && !endExamId
   if (needsMid || needsEnd) {
-    // Include legacy examinations with a null assessment_component. They are
-    // classified by name below so existing Mid Term/End Term data continues
-    // to work after the assessment-component migration.
     const { data: allCandidates } = await supabase.from('exams')
       .select('id,name,term,academic_year,assessment_component,created_at')
       .eq('tenant_id', tenantId)
       .order('created_at', { ascending: false })
-    const candidates = (allCandidates ?? []).filter(e => e.term === selectedExam.term && e.academic_year === selectedExam.academic_year)
+    const candidates = (allCandidates ?? []).filter(e => sameAcademicTerm(e, selectedExam))
     const ids = candidates.map(e => e.id)
     if (ids.length) {
       const { data: classLinks } = await supabase.from('exam_classes').select('exam_id').eq('class_id', classId).in('exam_id', ids)
@@ -183,8 +189,8 @@ export async function getConfiguredAssessmentResults(
     }
   }
 
-  if (components.midTerm && !midExamId) return { rows: [], selectedExam, midExamId, endExamId, error: 'A Mid Term examination assigned to this class could not be found for the selected term and academic year.' }
-  if (components.endTerm && !endExamId) return { rows: [], selectedExam, midExamId, endExamId, error: 'An End Term examination assigned to this class could not be found for the selected term and academic year.' }
+  if (components.midTerm && !midExamId) return { rows: [], selectedExam, midExamId, endExamId, error: 'A Mid Term examination assigned to this grade could not be found for the selected term and academic year.' }
+  if (components.endTerm && !endExamId) return { rows: [], selectedExam, midExamId, endExamId, error: 'An End Term examination assigned to this grade could not be found for the selected term and academic year.' }
 
   const averageSourceExamId = components.average && !components.midTerm && !components.endTerm ? selectedExam.id : null
   const examIds = [midExamId, endExamId, averageSourceExamId].filter((id): id is string => Boolean(id))
@@ -238,7 +244,7 @@ export async function getConfiguredAssessmentResults(
       const average = components.average
         ? averageSourceExamId
           ? item.endTerm
-          : averageValues.length ? averageValues.reduce((a, b) => a + b, 0) / averageValues.length : null
+          : averageValues.length ? averageValues.reduce((a, b) => (a + b), 0) / averageValues.length : null
         : null
       const gradeScore = average ?? (components.endTerm ? item.endTerm : null) ?? (components.midTerm ? item.midTerm : null)
       const grade = gradeScore === null ? '' : getGrade(gradeScore, scale)
