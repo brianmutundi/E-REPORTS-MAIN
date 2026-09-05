@@ -7,7 +7,16 @@ import { friendlyDbRedirect } from '@/lib/db-errors'
 import { defaultReportTemplate, validTemplateKey } from '@/lib/report-template'
 import { parseTermReference, nextTermReference, termLabel } from '@/lib/terms'
 
-/** Saves the default report form and the term calendar dates for the selected examination's term. */
+/**
+ * Saves report settings and the school term calendar.
+ *
+ * IMPORTANT: Assessment reports show the end of the CURRENT term followed by
+ * the start of the NEXT term. Therefore the valid date relationship is:
+ *
+ *   current term closing date < next term opening date
+ *
+ * The two dates are deliberately NOT treated as a single same-term range.
+ */
 export async function saveReportSettings(formData: FormData) {
   const { supabase, user, tenantId } = await getDashboardSession()
   if (!user) redirect('/login')
@@ -15,14 +24,6 @@ export async function saveReportSettings(formData: FormData) {
 
   const opening = String(formData.get('opening_date') || '').trim() || null
   const closing = String(formData.get('closing_date') || '').trim() || null
-
-  // Dates are validated only from the values submitted by the currently
-  // authenticated tenant. No other school's settings are read or used here.
-  // ISO date strings (YYYY-MM-DD) sort chronologically, so this comparison is
-  // deterministic and does not depend on the server's timezone.
-  if (opening && closing && opening >= closing) {
-    redirect('/dashboard/reports?error=' + encodeURIComponent('Invalid date range|For this school, the opening date must be before the closing date.'))
-  }
 
   const templateKey = String(formData.get('template_key') || '').trim()
   const finalTemplateKey = validTemplateKey(templateKey) ? templateKey : 'standard'
@@ -70,7 +71,15 @@ export async function saveReportSettings(formData: FormData) {
   }
 
   const currentTerm = parseTermReference({ term: examTerm, academicYear: examYear })
-  if (currentTerm && closing) {
+
+  // The report's two dates span the boundary between terms:
+  // closing = current term closing; opening = next term opening.
+  // Consequently the correct invariant is closing < opening.
+  if (closing && opening && closing >= opening) {
+    redirect('/dashboard/reports?error=' + encodeURIComponent('Invalid date range|The closing date must be before the next term opening date.'))
+  }
+
+  if (currentTerm && closing && opening) {
     const next = nextTermReference(currentTerm)
     const { data: nextRow } = await supabase
       .from('terms')
@@ -79,9 +88,13 @@ export async function saveReportSettings(formData: FormData) {
       .eq('academic_year', next.year)
       .eq('term_label', next.label)
       .maybeSingle()
-    const nextOpening = nextRow?.opening_date ?? null
-    if (nextOpening && nextOpening <= closing) {
-      redirect('/dashboard/reports?error=' + encodeURIComponent('Invalid date range|For this school, the next term opening date must be after this term closing date.'))
+
+    // If a next-term opening already exists, it must agree with the submitted
+    // report opening date. This prevents silently writing one date to the
+    // report config and a different date to the term calendar.
+    const existingNextOpening = nextRow?.opening_date ?? null
+    if (existingNextOpening && existingNextOpening !== opening) {
+      redirect('/dashboard/reports?error=' + encodeURIComponent('Invalid date range|The opening date must match the next term opening date for this school.'))
     }
   }
 
@@ -101,19 +114,61 @@ export async function saveReportSettings(formData: FormData) {
   if (error) redirect('/dashboard/reports?error=' + encodeURIComponent('Error|' + (friendlyDbRedirect(error) || 'Could not save the report settings.')))
 
   if (currentTerm) {
-    const { error: termError } = await supabase
-      .from('terms')
-      .upsert(
-        {
-          tenant_id: tenantId,
-          academic_year: currentTerm.year,
-          term_label: currentTerm.label,
-          opening_date: opening,
-          closing_date: closing,
-        },
-        { onConflict: 'tenant_id,academic_year,term_label', ignoreDuplicates: false },
-      )
-    if (termError) redirect('/dashboard/reports?error=' + encodeURIComponent('Error|' + (friendlyDbRedirect(termError) || `Could not save the ${termLabel(currentTerm.termNumber)} dates.`)))
+    const next = nextTermReference(currentTerm)
+
+    // Store the current term's closing date without overwriting its own
+    // opening date. Store the submitted opening date on the NEXT term.
+    if (closing) {
+      const { data: currentRow } = await supabase
+        .from('terms')
+        .select('opening_date')
+        .eq('tenant_id', tenantId)
+        .eq('academic_year', currentTerm.year)
+        .eq('term_label', currentTerm.label)
+        .maybeSingle()
+
+      const { error: currentTermError } = await supabase
+        .from('terms')
+        .upsert(
+          {
+            tenant_id: tenantId,
+            academic_year: currentTerm.year,
+            term_label: currentTerm.label,
+            opening_date: currentRow?.opening_date ?? null,
+            closing_date: closing,
+          },
+          { onConflict: 'tenant_id,academic_year,term_label', ignoreDuplicates: false },
+        )
+      if (currentTermError) redirect('/dashboard/reports?error=' + encodeURIComponent('Error|' + (friendlyDbRedirect(currentTermError) || `Could not save the ${termLabel(currentTerm.termNumber)} closing date.`)))
+    }
+
+    if (opening) {
+      const { data: nextRow } = await supabase
+        .from('terms')
+        .select('closing_date')
+        .eq('tenant_id', tenantId)
+        .eq('academic_year', next.year)
+        .eq('term_label', next.label)
+        .maybeSingle()
+
+      if (nextRow?.closing_date && nextRow.closing_date <= opening) {
+        redirect('/dashboard/reports?error=' + encodeURIComponent('Invalid date range|The next term opening date must be before that term closes.'))
+      }
+
+      const { error: nextTermError } = await supabase
+        .from('terms')
+        .upsert(
+          {
+            tenant_id: tenantId,
+            academic_year: next.year,
+            term_label: next.label,
+            opening_date: opening,
+            closing_date: nextRow?.closing_date ?? null,
+          },
+          { onConflict: 'tenant_id,academic_year,term_label', ignoreDuplicates: false },
+        )
+      if (nextTermError) redirect('/dashboard/reports?error=' + encodeURIComponent('Error|' + (friendlyDbRedirect(nextTermError) || `Could not save the ${termLabel(next.termNumber)} opening date.`)))
+    }
   }
 
   const { error: keyError } = await supabase
