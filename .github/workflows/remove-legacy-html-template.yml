@@ -1,0 +1,34 @@
+name: Remove legacy custom HTML template
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Remove legacy template key
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('lib/report-template.ts')
+          text = path.read_text()
+          text = text.replace(
+              "/** Active report templates. The legacy html_custom key is intentionally not selectable. */\nexport const REPORT_TEMPLATE_KEYS = ['standard', 'cbc_4level'] as const\nexport type ReportTemplateKey = (typeof REPORT_TEMPLATE_KEYS)[number] | 'html_custom'\ntype ActiveReportTemplateKey = (typeof REPORT_TEMPLATE_KEYS)[number]\n\nexport const REPORT_TEMPLATE_LABELS: Record<ReportTemplateKey, string> = {\n  standard: 'Standard Assessment Report',\n  cbc_4level: 'CBC 4-Level Assessment Report',\n  html_custom: 'Legacy Custom HTML (disabled)',\n}\n\n/** Only active templates are valid for new or updated report settings. */\nexport function validTemplateKey(value: unknown): value is ActiveReportTemplateKey {",
+              "export const REPORT_TEMPLATE_KEYS = ['standard', 'cbc_4level'] as const\nexport type ReportTemplateKey = (typeof REPORT_TEMPLATE_KEYS)[number]\n\nexport const REPORT_TEMPLATE_LABELS: Record<ReportTemplateKey, string> = {\n  standard: 'Standard Assessment Report',\n  cbc_4level: 'CBC 4-Level Assessment Report',\n}\n\nexport function validTemplateKey(value: unknown): value is ReportTemplateKey {",
+          )
+          path.write_text(text)
+          PY
+          if grep -n "html_custom" lib/report-template.ts; then exit 1; fi
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add lib/report-template.ts
+          git commit -m 'fix: remove legacy custom HTML template definition'
+          git push
