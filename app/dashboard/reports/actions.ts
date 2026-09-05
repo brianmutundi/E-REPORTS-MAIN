@@ -5,15 +5,14 @@ import { redirect } from 'next/navigation'
 import { getDashboardSession } from '@/lib/supabase/session'
 import { friendlyDbRedirect } from '@/lib/db-errors'
 import { defaultReportTemplate, validTemplateKey } from '@/lib/report-template'
-import { parseTermReference, nextTermReference, termLabel } from '@/lib/terms'
+import { parseTermReference, termLabel } from '@/lib/terms'
 
 /**
- * Report settings use a cross-term pair of dates:
- * - closing_date = the end of the selected/current term
- * - opening_date = the start of the following term
+ * Report settings edit the opening and closing dates of the TERM selected by
+ * the examination. The report itself displays the current term's closing date
+ * and the following term's opening date via getEffectiveTermDates().
  *
- * The report pair must therefore satisfy closing_date < opening_date.
- * The terms table itself keeps its normal invariant for EACH term:
+ * Therefore the settings form must validate the normal per-term invariant:
  * opening_date < closing_date.
  */
 export async function saveReportSettings(formData: FormData) {
@@ -54,27 +53,30 @@ export async function saveReportSettings(formData: FormData) {
 
   const currentTerm = parseTermReference({ term: examTerm, academicYear: examYear })
 
-  // These are dates across a term boundary, not the opening/closing dates of one term.
-  if (closing && opening && closing >= opening) {
-    redirect('/dashboard/reports?error=' + encodeURIComponent('Invalid date range|The school closing date must be before the next term opening date.'))
+  if (opening && closing && opening >= closing) {
+    const label = currentTerm ? termLabel(currentTerm.termNumber) : 'selected term'
+    redirect('/dashboard/reports?error=' + encodeURIComponent(`Invalid date range|The ${label} closing date must be after its opening date.`))
   }
 
   if (currentTerm) {
-    const next = nextTermReference(currentTerm)
-    const [currentRes, nextRes] = await Promise.all([
-      supabase.from('terms').select('opening_date,closing_date').eq('tenant_id', tenantId).eq('academic_year', currentTerm.year).eq('term_label', currentTerm.label).maybeSingle(),
-      supabase.from('terms').select('opening_date,closing_date').eq('tenant_id', tenantId).eq('academic_year', next.year).eq('term_label', next.label).maybeSingle(),
-    ])
-    if (currentRes.error) redirect('/dashboard/reports?error=' + encodeURIComponent('Error|' + (friendlyDbRedirect(currentRes.error) || 'Could not read the current term calendar.')))
-    if (nextRes.error) redirect('/dashboard/reports?error=' + encodeURIComponent('Error|' + (friendlyDbRedirect(nextRes.error) || 'Could not read the next term calendar.')))
+    const { data: currentRes, error: currentError } = await supabase
+      .from('terms')
+      .select('id,opening_date,closing_date')
+      .eq('tenant_id', tenantId)
+      .eq('academic_year', currentTerm.year)
+      .eq('term_label', currentTerm.label)
+      .maybeSingle()
 
-    // The terms table has its own per-term constraint: opening < closing.
-    // Validate both terms explicitly before writing, so users never receive a raw DB constraint error.
-    if (closing && currentRes.data?.opening_date && closing <= currentRes.data.opening_date) {
-      redirect('/dashboard/reports?error=' + encodeURIComponent(`Invalid date range|The ${termLabel(currentTerm.termNumber)} closing date must be after its opening date.`))
+    if (currentError) {
+      redirect('/dashboard/reports?error=' + encodeURIComponent('Error|' + (friendlyDbRedirect(currentError) || 'Could not read the selected term calendar.')))
     }
-    if (opening && nextRes.data?.closing_date && opening >= nextRes.data.closing_date) {
-      redirect('/dashboard/reports?error=' + encodeURIComponent(`Invalid date range|The next ${termLabel(next.termNumber)} opening date must be before its closing date.`))
+
+    // Preserve existing dates when the form leaves one field blank. Validate
+    // the resulting complete term pair before writing, if both are known.
+    const effectiveOpening = opening ?? currentRes?.opening_date ?? null
+    const effectiveClosing = closing ?? currentRes?.closing_date ?? null
+    if (effectiveOpening && effectiveClosing && effectiveOpening >= effectiveClosing) {
+      redirect('/dashboard/reports?error=' + encodeURIComponent(`Invalid date range|The ${termLabel(currentTerm.termNumber)} closing date must be after its opening date.`))
     }
   }
 
@@ -88,25 +90,31 @@ export async function saveReportSettings(formData: FormData) {
   }, { onConflict: 'report_template_id' })
   if (error) redirect('/dashboard/reports?error=' + encodeURIComponent('Error|' + (friendlyDbRedirect(error) || 'Could not save the report settings.')))
 
-  if (currentTerm) {
-    const next = nextTermReference(currentTerm)
+  if (currentTerm && (opening || closing)) {
+    const { data: currentRow, error: rowError } = await supabase
+      .from('terms')
+      .select('id,opening_date,closing_date')
+      .eq('tenant_id', tenantId)
+      .eq('academic_year', currentTerm.year)
+      .eq('term_label', currentTerm.label)
+      .maybeSingle()
 
-    // Update only the date belonging to each term. Never copy the cross-term
-    // report opening date into the current term, and never overwrite a term's other date.
-    if (closing) {
-      const { data: currentRow } = await supabase.from('terms').select('id').eq('tenant_id', tenantId).eq('academic_year', currentTerm.year).eq('term_label', currentTerm.label).maybeSingle()
-      const result = currentRow?.id
-        ? await supabase.from('terms').update({ closing_date: closing }).eq('id', currentRow.id).eq('tenant_id', tenantId)
-        : await supabase.from('terms').insert({ tenant_id: tenantId, academic_year: currentTerm.year, term_label: currentTerm.label, opening_date: null, closing_date: closing })
-      if (result.error) redirect('/dashboard/reports?error=' + encodeURIComponent('Error|' + (friendlyDbRedirect(result.error) || `Could not save the ${termLabel(currentTerm.termNumber)} closing date.`)))
+    if (rowError) {
+      redirect('/dashboard/reports?error=' + encodeURIComponent('Error|' + (friendlyDbRedirect(rowError) || `Could not read the ${termLabel(currentTerm.termNumber)} calendar.`)))
     }
 
-    if (opening) {
-      const { data: nextRow } = await supabase.from('terms').select('id').eq('tenant_id', tenantId).eq('academic_year', next.year).eq('term_label', next.label).maybeSingle()
-      const result = nextRow?.id
-        ? await supabase.from('terms').update({ opening_date: opening }).eq('id', nextRow.id).eq('tenant_id', tenantId)
-        : await supabase.from('terms').insert({ tenant_id: tenantId, academic_year: next.year, term_label: next.label, opening_date: opening, closing_date: null })
-      if (result.error) redirect('/dashboard/reports?error=' + encodeURIComponent('Error|' + (friendlyDbRedirect(result.error) || `Could not save the ${termLabel(next.termNumber)} opening date.`)))
+    const currentOpening = opening ?? currentRow?.opening_date ?? null
+    const currentClosing = closing ?? currentRow?.closing_date ?? null
+    if (currentOpening && currentClosing && currentOpening >= currentClosing) {
+      redirect('/dashboard/reports?error=' + encodeURIComponent(`Invalid date range|The ${termLabel(currentTerm.termNumber)} closing date must be after its opening date.`))
+    }
+
+    const result = currentRow?.id
+      ? await supabase.from('terms').update({ opening_date: opening ?? currentRow.opening_date, closing_date: closing ?? currentRow.closing_date }).eq('id', currentRow.id).eq('tenant_id', tenantId)
+      : await supabase.from('terms').insert({ tenant_id: tenantId, academic_year: currentTerm.year, term_label: currentTerm.label, opening_date: opening, closing_date: closing })
+
+    if (result.error) {
+      redirect('/dashboard/reports?error=' + encodeURIComponent('Error|' + (friendlyDbRedirect(result.error) || `Could not save the ${termLabel(currentTerm.termNumber)} dates.`)))
     }
   }
 
