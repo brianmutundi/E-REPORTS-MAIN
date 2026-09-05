@@ -6,6 +6,18 @@ export type AssessmentComponents = {
   average: boolean
 }
 
+export const REPORT_TEMPLATE_KEYS = ['standard', 'cbc_4level'] as const
+export type ReportTemplateKey = (typeof REPORT_TEMPLATE_KEYS)[number]
+
+export const REPORT_TEMPLATE_LABELS: Record<ReportTemplateKey, string> = {
+  standard: 'Standard Assessment Report',
+  cbc_4level: 'CBC 4-Level Assessment Report',
+}
+
+export function validTemplateKey(value: unknown): value is ReportTemplateKey {
+  return REPORT_TEMPLATE_KEYS.some((key) => key === value)
+}
+
 export type ReportTemplate = {
   school: { name: boolean; logo: boolean; contact: boolean }
   student: { name: boolean; admissionNo: boolean; className: boolean; stream: boolean }

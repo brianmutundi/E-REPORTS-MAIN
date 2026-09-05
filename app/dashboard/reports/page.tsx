@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { getConfiguredAssessmentResults } from '@/lib/results'
-import { getReportTenant, normalizeReportTemplate } from '@/lib/report-template'
+import { getReportTenant, normalizeReportTemplate, validTemplateKey, REPORT_TEMPLATE_KEYS, REPORT_TEMPLATE_LABELS } from '@/lib/report-template'
 import { getTenantGradingScale, remarkForLevel } from '@/lib/grading'
 import { getDashboardSession } from '@/lib/supabase/session'
 import { getScopeStreams, getScopeExams, type ScopeExam } from '@/lib/scope'
@@ -9,7 +9,7 @@ import CascadingFilterBar from '@/components/CascadingFilterBar'
 import ScrollToReport from '@/components/ScrollToReport'
 import SuccessToast from '@/components/SuccessToast'
 import SubmitButton from '@/components/SubmitButton'
-import { saveReportPeriod } from './actions'
+import { saveReportSettings } from './actions'
 
 export default async function ReportsPage({ searchParams }: { searchParams: Promise<{ exam?: string; class?: string; student?: string; stream?: string; saved?: string; error?: string }> }) {
   const params = await searchParams
@@ -20,7 +20,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   // of remote latency, so batching these avoids a serial waterfall that added up).
   const [classesRes, templateRes, gradingScale, streams, exams, tenant] = await Promise.all([
     supabase.from('classes').select('id,name,teacher_name,principal_name').eq('tenant_id', tenantId).order('name'),
-    supabase.from('report_templates').select('id,name,template_json').eq('tenant_id', tenantId).eq('is_default', true).maybeSingle(),
+    supabase.from('report_templates').select('id,name,template_json,template_key').eq('tenant_id', tenantId).eq('is_default', true).maybeSingle(),
     getTenantGradingScale(tenantId),
     params.class ? getScopeStreams(supabase, tenantId, params.class) : Promise.resolve([] as { id: string; name: string }[]),
     params.class ? getScopeExams(supabase, tenantId, params.class) : Promise.resolve([] as ScopeExam[]),
@@ -28,7 +28,13 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   ])
   let classes = classesRes.data
   if (classes === null) { const r = await supabase.from('classes').select('id,name').eq('tenant_id', tenantId).order('name'); classes = r.data as any }
-  const templateRow = templateRes.data
+  let templateRow: { id: string | null; name: string | null; template_json: unknown; template_key?: string | null } | null = templateRes.data
+  if (!templateRow && templateRes.error) {
+    const retry = await supabase.from('report_templates').select('id,name,template_json').eq('tenant_id', tenantId).eq('is_default', true).maybeSingle()
+    if (!retry.error) templateRow = retry.data
+  }
+  const rowKey = templateRow?.template_key
+  const templateKey = validTemplateKey(rowKey) ? rowKey : 'standard'
   const template = normalizeReportTemplate(templateRow?.template_json)
   const hasStreams = streams.length > 0
   const hasExams = exams.length > 0
@@ -72,28 +78,29 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const scoreHeader = (label: string) => (singleScoreColumn ? 'Score' : label)
 
   return <main className="main" style={{ maxWidth: 1120, margin: '0 auto' }}>
-    <div className="top no-print"><div><div className="eyebrow">Assessment reports</div><h1 className="title">Student Assessment Reports</h1><p className="muted">Set the term dates for this school and select an examination and grade to view the report form.</p></div></div>
+    <div className="top no-print"><div><div className="eyebrow">Assessment reports</div><h1 className="title">Student Assessment Reports</h1><p className="muted">Choose the report form, set the term dates for this school, and select an examination and grade to view the report form.</p></div></div>
 
     {params.error && (() => { const idx = params.error.indexOf('|'); return idx > -1 ? <div className="notice error no-print" style={{ marginTop: 16 }}><span className="font-semibold">{params.error.slice(0, idx)}</span><span className="block text-xs opacity-80 mt-0.5">{params.error.slice(idx + 1)}</span></div> : <div className="notice error no-print" style={{ marginTop: 16 }}>{params.error}</div> })()}
-    {params.saved && <SuccessToast message="Report period saved" />}
+    {params.saved && <SuccessToast message="Report settings saved" />}
 
     <section className="card no-print" style={{ marginTop: 20 }}>
       <div className="section-heading">
         <div>
-          <h2 className="section-title">Report period</h2>
-          <p className="muted">These opening and closing dates are stored with the report template and appear on generated reports.</p>
+          <h2 className="section-title">Report settings</h2>
+          <p className="muted">The selected form renders the PDF reports, and the opening and closing dates are stored with the report form and appear on generated reports.</p>
         </div>
       </div>
-      <form action={saveReportPeriod}>
+      <form action={saveReportSettings}>
         <input type="hidden" name="exam" value={params.exam ?? ''} />
         <input type="hidden" name="class" value={params.class ?? ''} />
         <input type="hidden" name="stream" value={params.stream ?? ''} />
         <div className="form-grid">
+          <label className="field-label">Report template<select name="template_key" defaultValue={templateKey}>{REPORT_TEMPLATE_KEYS.map(key => <option key={key} value={key}>{REPORT_TEMPLATE_LABELS[key]}</option>)}</select></label>
           <label className="field-label">Opening date<input type="date" name="opening_date" defaultValue={openingDate ?? ''} /></label>
           <label className="field-label">Closing date<input type="date" name="closing_date" defaultValue={closingDate ?? ''} /></label>
         </div>
         <div className="actions-inline" style={{ marginTop: 14 }}>
-          <SubmitButton>Save report period</SubmitButton>
+          <SubmitButton>Save report settings</SubmitButton>
         </div>
       </form>
     </section>

@@ -1,0 +1,4 @@
+-- No-op reconciliation entry.
+-- This migration was applied directly to the remote database before a matching
+-- local file existed. It is kept as an empty placeholder so that local and
+-- remote migration history stay in sync.
