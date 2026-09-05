@@ -24,7 +24,11 @@ export function normalizeReportTemplate(value: unknown): ReportTemplate { const 
 export const templateFields: { section: keyof Omit<ReportTemplate, 'assessmentComponents'>; key: string; label: string }[] = [
   { section: 'school', key: 'name', label: 'School name' }, { section: 'school', key: 'logo', label: 'School logo' }, { section: 'school', key: 'contact', label: 'School contact details (P.O Box / address)' }, { section: 'student', key: 'name', label: 'Student name' }, { section: 'student', key: 'admissionNo', label: 'Admission number' }, { section: 'student', key: 'className', label: 'Grade' }, { section: 'student', key: 'stream', label: 'Stream' }, { section: 'examination', key: 'name', label: 'Examination name' }, { section: 'examination', key: 'academicYear', label: 'Academic year' }, { section: 'examination', key: 'term', label: 'Term / period' }, { section: 'results', key: 'learningArea', label: 'Learning area' }, { section: 'results', key: 'grade', label: 'Level (grade)' }, { section: 'results', key: 'gradeDescription', label: 'Grade description' }, { section: 'results', key: 'total', label: 'Total' }, { section: 'results', key: 'average', label: 'Average / mean' }, { section: 'additional', key: 'teacherComment', label: 'Grade class teacher remark' }, { section: 'additional', key: 'overallComment', label: 'Principal remark' }, { section: 'additional', key: 'signatureArea', label: 'Signature area' },
 ]
-export type ReportTenant = { name: string; code: string | null; logo_url: string | null; address: string | null }
+
+// `tenants.code` was removed from the production schema. Keep the property
+// optional for consumers that still expose a legacy schoolCode field, but do
+// not request it from PostgREST/Supabase.
+export type ReportTenant = { name: string; code?: string | null; logo_url: string | null; address: string | null }
 
 /** Resolve only the already-authenticated tenant. The caller must obtain tenantId from getDashboardSession. */
 export async function getReportTenant(supabase: SupabaseClient, tenantId: string): Promise<ReportTenant | null> {
@@ -36,7 +40,7 @@ export async function getReportTenant(supabase: SupabaseClient, tenantId: string
     const admin = createAdminClient()
     const { data, error } = await admin
       .from('tenants')
-      .select('name,code,logo_url,address')
+      .select('name,logo_url,address')
       .eq('id', tenantId)
       .maybeSingle()
     if (!error && data) return data as ReportTenant
@@ -48,7 +52,7 @@ export async function getReportTenant(supabase: SupabaseClient, tenantId: string
 
   const primary = await supabase
     .from('tenants')
-    .select('name,code,logo_url,address')
+    .select('name,logo_url,address')
     .eq('id', tenantId)
     .maybeSingle()
   if (!primary.error && primary.data) return primary.data as ReportTenant
@@ -61,7 +65,7 @@ export async function getReportTenant(supabase: SupabaseClient, tenantId: string
   if (primary.error) {
     const basic = await supabase
       .from('tenants')
-      .select('name,code,logo_url')
+      .select('name,logo_url')
       .eq('id', tenantId)
       .maybeSingle()
     if (!basic.error && basic.data) return { ...basic.data, address: null } as ReportTenant
