@@ -62,6 +62,7 @@ async function saveStudent(formData: FormData) {
   const selectedClassId = String(formData.get('selected_class_id') || '').trim()
   const editClassId = String(formData.get('class_id') || '').trim()
   const streamIdRaw = String(formData.get('stream_id') || '').trim()
+  const guardianPhone = String(formData.get('guardian_phone') || '').trim().slice(0, 50)
 
   if (!admissionNo || !fullName) {
     redirect(
@@ -139,7 +140,8 @@ async function saveStudent(formData: FormData) {
   }
 
   const payload = { admission_no: admissionNo, full_name: fullName, class_id: safeClassId }
-  const streamPayload = streamId ? { ...payload, stream_id: streamId } : payload
+  const withPhone = guardianPhone ? { ...payload, guardian_phone: guardianPhone } : payload
+  const streamPayload = streamId ? { ...withPhone, stream_id: streamId } : withPhone
 
   let result = id
     ? await supabase.from('students').update(streamPayload).eq('id', id).eq('tenant_id', tenantId)
@@ -148,6 +150,12 @@ async function saveStudent(formData: FormData) {
   // Tolerant fallback: if the live schema lacks stream_id (migration not yet applied),
   // retry the save without it rather than blocking the learner record.
   if (result.error && (result.error.code === '42703' || result.error.message?.toLowerCase().includes('stream_id'))) {
+    result = id
+      ? await supabase.from('students').update(withPhone).eq('id', id).eq('tenant_id', tenantId)
+      : await supabase.from('students').insert({ ...withPhone, tenant_id: tenantId })
+  }
+  // Tolerant fallback: if guardian_phone is not yet on the live schema, drop it.
+  if (result.error && (result.error.code === '42703' || result.error.message?.toLowerCase().includes('guardian_phone'))) {
     result = id
       ? await supabase.from('students').update(payload).eq('id', id).eq('tenant_id', tenantId)
       : await supabase.from('students').insert({ ...payload, tenant_id: tenantId })
@@ -247,6 +255,7 @@ type StudentRow = {
   full_name: string
   class_id: string | null
   stream_id?: string | null
+  guardian_phone?: string | null
 }
 
 export default async function StudentsPage({
@@ -280,7 +289,7 @@ export default async function StudentsPage({
   const { data: students } = selectedClassId
     ? await supabase
         .from('students')
-        .select('id,admission_no,full_name,class_id,stream_id')
+        .select('id,admission_no,full_name,class_id,stream_id,guardian_phone')
         .eq('tenant_id', tenantId)
         .eq('class_id', selectedClassId)
         .order('full_name')
@@ -487,6 +496,10 @@ export default async function StudentsPage({
                     </select>
                   </label>
                 )}
+                <label className="field-label">
+                  Parent phone (for SMS)
+                  <input name="guardian_phone" placeholder="e.g. 0712345678" />
+                </label>
                 <SubmitButton className="student-btn w-full lg:w-auto">Add student</SubmitButton>
               </form>
             </section>
@@ -526,6 +539,10 @@ export default async function StudentsPage({
                     </select>
                   </label>
                 )}
+                <label className="field-label">
+                  Parent phone (for SMS)
+                  <input name="guardian_phone" placeholder="e.g. 0712345678" defaultValue={editing.guardian_phone ?? ''} />
+                </label>
                 <SubmitButton className="student-btn w-full lg:w-auto">Update</SubmitButton>
                 <Link className="student-btn secondary w-full lg:w-auto" href={`/dashboard/students?class_id=${encodeURIComponent(selectedClass.id)}`}>
                   Cancel

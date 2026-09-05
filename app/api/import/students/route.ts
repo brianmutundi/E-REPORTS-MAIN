@@ -104,6 +104,7 @@ export async function POST(request: NextRequest) {
         row: row.row as number,
         admissionNo: row.admissionNo,
         fullName: row.fullName,
+        guardianPhone: typeof row.guardianPhone === 'string' ? row.guardianPhone : '',
         className: selectedClass.name,
         classId: selectedClass.id,
         status: 'new',

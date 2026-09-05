@@ -17,6 +17,7 @@ const nextConfig: NextConfig = {
     '/api/results/export/pdf': ['./node_modules/pdfkit/js/standard-fonts/**/*'],
     '/api/analysis/export/pdf': ['./node_modules/pdfkit/js/standard-fonts/**/*'],
     '/api/students/export/pdf': ['./node_modules/pdfkit/js/standard-fonts/**/*'],
+    '/api/transcript/pdf': ['./node_modules/pdfkit/js/standard-fonts/**/*'],
   },
   async headers() {
     const supabaseHost = process.env.NEXT_PUBLIC_SUPABASE_URL

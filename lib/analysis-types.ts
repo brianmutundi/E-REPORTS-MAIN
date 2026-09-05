@@ -87,6 +87,8 @@ export type AnalysisLearningAreaResult = {
   lowestName: string | null
   lowestScore: number | null
   insufficient: boolean
+  /** Per-level learner counts for this learning area, aligned with the active grading scale. */
+  distribution: AnalysisLevel[]
 }
 
 export type HistogramBin = {

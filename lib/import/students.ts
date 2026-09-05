@@ -8,6 +8,7 @@ export type StudentPreviewRow = {
   row: number
   admissionNo: string
   fullName: string
+  guardianPhone: string
   className: string
   classId: string
   status: 'new' | 'existing' | 'error'
@@ -23,6 +24,7 @@ export type StudentImportPreview = {
 }
 
 const REQUIRED_HEADERS = ['adm no', 'name']
+const OPTIONAL_HEADERS = ['parent phone']
 
 function hasUnclosedQuote(text: string): boolean {
   let inQuotes = false
@@ -81,8 +83,11 @@ export async function buildStudentImportPreview(
   const headers = table[0].map((h) => h.trim())
   const normalizedHeaders = headers.map(normalizeHeader)
   const validHeaders =
-    normalizedHeaders.length === REQUIRED_HEADERS.length &&
-    normalizedHeaders.every((header, index) => header === REQUIRED_HEADERS[index])
+    normalizedHeaders.length >= 2 &&
+    normalizedHeaders.length <= 3 &&
+    normalizedHeaders[0] === REQUIRED_HEADERS[0] &&
+    normalizedHeaders[1] === REQUIRED_HEADERS[1] &&
+    (normalizedHeaders.length === 2 || normalizedHeaders[2] === OPTIONAL_HEADERS[0])
 
   if (!validHeaders) {
     return {
@@ -94,7 +99,7 @@ export async function buildStudentImportPreview(
           row: 1,
           field: 'headers',
           value: headers.join(', '),
-          reason: 'The file must contain exactly these columns, in this order: "Adm No, Name".',
+          reason: 'The file must contain "Adm No" and "Name" columns in that order, optionally followed by a "Parent Phone" column.',
         },
       ],
       summary: emptySummary,
@@ -102,7 +107,7 @@ export async function buildStudentImportPreview(
   }
 
   const dataRows = table.slice(1)
-  const parsedRows: { row: number; admissionNo: string; fullName: string; errors: string[] }[] = []
+  const parsedRows: { row: number; admissionNo: string; fullName: string; guardianPhone: string; errors: string[] }[] = []
   const admissionNumbers = new Set<string>()
   const errors: StudentRowError[] = []
 
@@ -110,11 +115,12 @@ export async function buildStudentImportPreview(
     const rowNumber = i + 2
     const admissionNo = (cells[0] ?? '').trim()
     const fullName = (cells[1] ?? '').trim()
+    const guardianPhone = (cells[2] ?? '').trim().slice(0, 50)
     const rowErrors: string[] = []
 
-    if (cells.length > 2) {
-      rowErrors.push('Too many columns. Only Adm No and Name are allowed.')
-      errors.push({ row: rowNumber, field: 'file', value: cells.slice(2).join(', '), reason: 'Only "Adm No" and "Name" columns are allowed.' })
+    if (cells.length > 3) {
+      rowErrors.push('Too many columns. Only Adm No, Name and optional Parent Phone are allowed.')
+      errors.push({ row: rowNumber, field: 'file', value: cells.slice(3).join(', '), reason: 'Only "Adm No", "Name" and optional "Parent Phone" columns are allowed.' })
     }
 
     if (!admissionNo) {
@@ -134,7 +140,7 @@ export async function buildStudentImportPreview(
     }
     if (admissionNo) admissionNumbers.add(key)
 
-    parsedRows.push({ row: rowNumber, admissionNo, fullName, errors: rowErrors })
+    parsedRows.push({ row: rowNumber, admissionNo, fullName, guardianPhone, errors: rowErrors })
   })
 
   const candidates = parsedRows.filter((row) => row.errors.length === 0)
@@ -205,13 +211,14 @@ export async function commitStudentImport(
   rows: StudentPreviewRow[],
 ): Promise<StudentImportCommitResult> {
   const errors: StudentRowError[] = []
-  const candidates: { row: number; admissionNo: string; fullName: string }[] = []
+  const candidates: { row: number; admissionNo: string; fullName: string; guardianPhone: string }[] = []
   const seen = new Set<string>()
   let skipped = 0
 
   for (const row of rows) {
     const admissionNo = String(row.admissionNo || '').trim()
     const fullName = String(row.fullName || '').trim()
+    const guardianPhone = String(row.guardianPhone || '').trim().slice(0, 50)
     const rowNumber = Number.isInteger(row.row) ? row.row : 0
 
     if (!admissionNo) {
@@ -229,7 +236,7 @@ export async function commitStudentImport(
       continue
     }
     seen.add(key)
-    candidates.push({ row: rowNumber, admissionNo, fullName })
+    candidates.push({ row: rowNumber, admissionNo, fullName, guardianPhone })
   }
 
   if (!candidates.length) {
@@ -268,7 +275,7 @@ export async function commitStudentImport(
   // conflicting row is skipped rather than updated or wiping valid siblings.
   const chunkSize = 100
   const recordError = (
-    error: { code?: string },
+    error: { code?: string; message?: string },
     row: { row: number; admissionNo: string; fullName: string },
   ) => {
     if (error.code === '23505') {
@@ -282,13 +289,26 @@ export async function commitStudentImport(
       reason: 'This student could not be imported.',
     })
   }
-  const insertOne = async (row: { row: number; admissionNo: string; fullName: string }) => {
-    const { error } = await supabase.from('students').insert({
-      tenant_id: tenantId,
-      admission_no: row.admissionNo,
-      full_name: toTitleCase(row.fullName),
-      class_id: classId,
-    })
+  const buildPayload = (
+    row: { row: number; admissionNo: string; fullName: string; guardianPhone: string },
+    includePhone: boolean,
+  ) => {
+    const base: Record<string, unknown> = { tenant_id: tenantId, admission_no: row.admissionNo, full_name: toTitleCase(row.fullName), class_id: classId }
+    if (!includePhone) return base
+    const phone = String(row.guardianPhone || '').trim()
+    return phone ? { ...base, guardian_phone: phone } : base
+  }
+  let includePhoneColumn = true
+  const insertChunk = async (chunk: { row: number; admissionNo: string; fullName: string; guardianPhone: string }[]) => {
+    const { error } = await supabase.from('students').insert(chunk.map((row) => buildPayload(row, includePhoneColumn)))
+    if (error && (error.code === '42703' || String(error.message ?? '').toLowerCase().includes('guardian_phone'))) {
+      includePhoneColumn = false
+      return await supabase.from('students').insert(chunk.map((row) => buildPayload(row, false)))
+    }
+    return { error }
+  }
+  const insertOne = async (row: { row: number; admissionNo: string; fullName: string; guardianPhone: string }) => {
+    const { error } = await insertChunk([row])
     if (!error) {
       created += 1
       return
@@ -298,14 +318,7 @@ export async function commitStudentImport(
 
   for (let i = 0; i < toInsert.length; i += chunkSize) {
     const chunk = toInsert.slice(i, i + chunkSize)
-    const { error } = await supabase.from('students').insert(
-      chunk.map((row) => ({
-        tenant_id: tenantId,
-        admission_no: row.admissionNo,
-        full_name: toTitleCase(row.fullName),
-        class_id: classId,
-      })),
-    )
+    const { error } = await insertChunk(chunk)
     if (!error) {
       created += chunk.length
       continue

@@ -9,6 +9,7 @@ import CascadingFilterBar from '@/components/CascadingFilterBar'
 import ScrollToReport from '@/components/ScrollToReport'
 import SuccessToast from '@/components/SuccessToast'
 import SubmitButton from '@/components/SubmitButton'
+import SmsSendQueue from '@/components/reports/SmsSendQueue'
 import { saveReportSettings } from './actions'
 
 export default async function ReportsPage({ searchParams }: { searchParams: Promise<{ exam?: string; class?: string; student?: string; stream?: string; saved?: string; error?: string }> }) {
@@ -66,6 +67,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const classTeacherName = (classes?.find(c => c.id === params.class) as any)?.teacher_name ?? null
   const classPrincipalName = (classes?.find(c => c.id === params.class) as any)?.principal_name ?? null
   const batchHref = hasSelection ? `/api/reports/pdf?exam=${params.exam}&class=${params.class}${params.stream ? `&stream=${params.stream}` : ''}` : '#'
+  const transcriptBatchHref = hasSelection ? `/api/transcript/pdf?class=${params.class}${params.stream ? `&stream=${params.stream}` : ''}` : '#'
   const openingDate = reportConfig?.opening_date ?? null
   const closingDate = reportConfig?.closing_date ?? null
 
@@ -76,6 +78,26 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   ].filter(c => c.active).map(c => c.label)
   const singleScoreColumn = scoreLabels.length === 1
   const scoreHeader = (label: string) => (singleScoreColumn ? 'Score' : label)
+
+  const smsItems: { studentId: string; admissionNo: string; fullName: string; phone: string; message: string; href: string }[] = []
+  if (hasSelection && results.length) {
+    const { data: phoneRows } = await supabase.from('students').select('id,guardian_phone').in('id', results.map(r => r.studentId))
+    const phoneMap = new Map((phoneRows ?? []).map(r => [r.id, (r as any).guardian_phone ?? '']))
+    for (const r of results) {
+      const phone = (phoneMap.get(r.studentId) ?? '').toString().trim()
+      const normalizedPhone = phone.replace(/[^0-9+]/g, '')
+      const subjectLines = r.subjects.map(s => {
+        const score = s.average ?? s.endTerm ?? s.midTerm
+        const grade = s.grade ?? ''
+        return `${s.subjectName}: ${score != null ? score.toFixed(1) : 'ABS'} (${grade})`
+      })
+      const header = [tenant?.name, exam?.name, exam?.term, exam?.academic_year].filter(Boolean).join(' · ')
+      const overall = r.overallLevel ? `Overall: ${r.overallLevel}${r.overallDescription ? ' - ' + r.overallDescription : ''}` : ''
+      const message = [header, ...subjectLines, overall].filter(Boolean).join('\n')
+      const href = normalizedPhone ? `sms:${normalizedPhone}?body=${encodeURIComponent(message)}` : '#'
+      smsItems.push({ studentId: r.studentId, admissionNo: r.admissionNo, fullName: r.fullName, phone, message, href })
+    }
+  }
 
   return <main className="main" style={{ maxWidth: 1120, margin: '0 auto' }}>
     <div className="top no-print"><div><div className="eyebrow">Assessment reports</div><h1 className="title">Student Assessment Reports</h1><p className="muted">Choose the report form, set the term dates for this school, and select an examination and grade to view the report form.</p></div></div>
@@ -147,8 +169,10 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, flexWrap: 'wrap', marginBottom: 16 }}>
           <div><div className="eyebrow">{exam?.name ?? 'Examination'}</div><h2 style={{ margin: '4px 0', fontSize: 20 }}>{className ?? 'Grade'} — Student Reports</h2><p className="muted">{results.length} student{results.length === 1 ? '' : 's'} found. Configured: {template.assessmentComponents.midTerm ? 'Mid Term ' : ''}{template.assessmentComponents.endTerm ? 'End Term ' : ''}{template.assessmentComponents.average ? 'Score' : ''}</p></div>
           {results.length > 0 && <a className="btn" href={batchHref} download>{hasStreams ? 'Generate Batch PDF' : 'Generate Grade PDF'}</a>}
+          {results.length > 0 && <a className="btn secondary" href={transcriptBatchHref} download>Transcript PDF</a>}
         </div>
-                    {results.length === 0 ? <div className="notice error">No students were found in the selected grade.</div> : <div style={{ display: 'grid', gap: 10 }}>{results.map(student => <div key={student.studentId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '14px 16px', border: '1px solid #e2e8f0', borderRadius: 12, background: params.student === student.studentId ? '#f8fafc' : 'white', flexWrap: 'wrap' }}><div style={{ minWidth: 0, flex: '1 1 250px' }}><div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', fontFamily: 'monospace' }}>{student.admissionNo}</div><div style={{ fontWeight: 700, color: '#0f172a', marginTop: 3 }}>{student.fullName}</div></div><div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}><span style={{ display: 'inline-flex', alignItems: 'center', padding: '5px 9px', borderRadius: 999, fontSize: 12, fontWeight: 700, background: student.complete ? '#ecfdf5' : '#fff7ed', color: student.complete ? '#047857' : '#c2410c' }}>{student.complete ? 'Complete' : 'Incomplete'}</span><Link className="btn secondary" href={`/dashboard/reports?exam=${params.exam}&class=${params.class}${params.stream ? `&stream=${params.stream}` : ''}&student=${student.studentId}`}>View Report</Link></div></div>)}</div>}
+                    {results.length === 0 ? <div className="notice error">No students were found in the selected grade.</div> : <div style={{ display: 'grid', gap: 10 }}>{results.map(student => <div key={student.studentId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '14px 16px', border: '1px solid #e2e8f0', borderRadius: 12, background: params.student === student.studentId ? '#f8fafc' : 'white', flexWrap: 'wrap' }}><div style={{ minWidth: 0, flex: '1 1 250px' }}><div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', fontFamily: 'monospace' }}>{student.admissionNo}</div><div style={{ fontWeight: 700, color: '#0f172a', marginTop: 3 }}>{student.fullName}</div></div><div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}><span style={{ display: 'inline-flex', alignItems: 'center', padding: '5px 9px', borderRadius: 999, fontSize: 12, fontWeight: 700, background: student.complete ? '#ecfdf5' : '#fff7ed', color: student.complete ? '#047857' : '#c2410c' }}>{student.complete ? 'Complete' : 'Incomplete'}</span><Link className="btn secondary" href={`/dashboard/reports?exam=${params.exam}&class=${params.class}${params.stream ? `&stream=${params.stream}` : ''}&student=${student.studentId}`}>View Report</Link><Link className="btn secondary" href={`/api/transcript/pdf?class=${params.class}&student=${student.studentId}`} target="_blank">Transcript</Link></div></div>)}</div>}
+        <SmsSendQueue items={smsItems} />
       </section>
     )}
 

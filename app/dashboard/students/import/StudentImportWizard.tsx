@@ -86,7 +86,7 @@ export default function StudentImportWizard({ classId, className }: { classId: s
         <div className="space-y-5 rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm">
           <div>
             <h2 className="text-base font-bold text-slate-900">1. Download the template</h2>
-            <p className="mt-1 text-sm text-slate-500">Required columns only: <span className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs">Adm No, Name</span>. The selected grade is supplied by the system.</p>
+            <p className="mt-1 text-sm text-slate-500">Required columns: <span className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs">Adm No, Name</span> — plus an optional <span className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs">Parent Phone</span> column for SMS-to-parents. The selected grade is supplied by the system.</p>
             <a href="/api/import/students/template" download className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"><Download className="h-4 w-4" /> Download CSV template</a>
           </div>
           <div className="border-t border-slate-100 pt-5">
@@ -128,8 +128,8 @@ export default function StudentImportWizard({ classId, className }: { classId: s
             <div className="border-b border-slate-100 bg-slate-50/50 p-4"><h2 className="text-base font-bold text-slate-900">Preview</h2><p className="mt-0.5 text-xs text-slate-500">Existing admission numbers remain unchanged and are skipped.</p></div>
             <div className="max-h-[420px] overflow-auto">
               <table className="w-full text-left text-sm text-slate-600">
-                <thead className="sticky top-0 border-b border-slate-200 bg-slate-50 text-[11px] font-semibold uppercase tracking-wider text-slate-500"><tr><th className="px-4 py-2.5">Row</th><th className="px-4 py-2.5">Adm No</th><th className="px-4 py-2.5">Name</th><th className="px-4 py-2.5">Selected Grade</th><th className="px-4 py-2.5">Status</th></tr></thead>
-                <tbody className="divide-y divide-slate-100">{preview.rows.map((row: StudentPreviewRow) => <tr key={row.row}><td className="px-4 py-2 font-mono text-xs">{row.row}</td><td className="px-4 py-2">{row.admissionNo}</td><td className="px-4 py-2">{row.fullName}</td><td className="px-4 py-2">{row.className}</td><td className="px-4 py-2"><StatusBadge status={row.status} /></td></tr>)}</tbody>
+                <thead className="sticky top-0 border-b border-slate-200 bg-slate-50 text-[11px] font-semibold uppercase tracking-wider text-slate-500"><tr><th className="px-4 py-2.5">Row</th><th className="px-4 py-2.5">Adm No</th><th className="px-4 py-2.5">Name</th><th className="px-4 py-2.5">Parent Phone</th><th className="px-4 py-2.5">Selected Grade</th><th className="px-4 py-2.5">Status</th></tr></thead>
+                <tbody className="divide-y divide-slate-100">{preview.rows.map((row: StudentPreviewRow) => <tr key={row.row}><td className="px-4 py-2 font-mono text-xs">{row.row}</td><td className="px-4 py-2">{row.admissionNo}</td><td className="px-4 py-2">{row.fullName}</td><td className="px-4 py-2">{row.guardianPhone || <span className="text-slate-300">—</span>}</td><td className="px-4 py-2">{row.className}</td><td className="px-4 py-2"><StatusBadge status={row.status} /></td></tr>)}</tbody>
               </table>
             </div>
           </div>

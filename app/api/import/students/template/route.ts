@@ -10,9 +10,9 @@ export async function GET() {
   if (!user) return new Response('Unauthorized', { status: 401 })
 
   const csv = toCsv([
-    ['Adm No', 'Name'],
-    ['ADM-1001', 'Jane Wanjiku'],
-    ['ADM-1002', 'John Otieno'],
+    ['Adm No', 'Name', 'Parent Phone'],
+    ['ADM-1001', 'Jane Wanjiku', '0712345678'],
+    ['ADM-1002', 'John Otieno', ''],
   ])
   return new NextResponse(csv, {
     headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="student-import-template.csv"' },

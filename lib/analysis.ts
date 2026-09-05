@@ -1,6 +1,6 @@
 import { getDashboardSession } from '@/lib/supabase/session'
 import { createClient } from '@/lib/supabase/server'
-import { computePercent, computeTotal, computeTotalMaximum, getTotalLevel, getTotalDescription, rankCompetitive, getTenantGradingScale, getTenantTotalGradingScale } from './grading'
+import { computePercent, computeTotal, computeTotalMaximum, getGrade, getTotalLevel, getTotalDescription, rankCompetitive, getTenantGradingScale, getTenantTotalGradingScale } from './grading'
 import { getReportTenant } from './report-template'
 import type { AssessmentAnalysisModel, AnalysisScope, AnalysisLearnerSubject, AnalysisLevel, AnalysisLearningAreaResult, AnalysisRankRow, HistogramBin, Insight, Anomaly, Recommendation, TrendPoint, LearnerTrendScores } from './analysis-types'
 import { levelColor } from './analysis-types'
@@ -285,6 +285,16 @@ export async function buildAssessmentAnalysis(params: AnalysisQueryParams): Prom
       lowestName,
       lowestScore,
       insufficient: insufficient || !scores.length,
+      distribution: scaleSet.map((lv) => {
+        const count = scores.filter((s) => getGrade(s, scale) === lv.code).length
+        return {
+          code: lv.code,
+          description: lv.description,
+          count,
+          percentage: scores.length ? (count / scores.length) * 100 : null,
+          color: lv.color,
+        }
+      }),
     }
   })
 

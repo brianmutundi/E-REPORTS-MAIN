@@ -2,7 +2,7 @@
 
 import React from 'react'
 import { Award, BarChart3, FileDown, AlertTriangle, BookOpen, GraduationCap, Info, TrendingUp, Users, Gauge } from 'lucide-react'
-import { CbcDonut, LearningAreaBarChart, ScoreHistogram, TrendLineChart } from './charts'
+import { CbcDonut, LearningAreaBarChart, LearningAreaLevelBars, ScoreHistogram, TrendLineChart } from './charts'
 import { levelColor, type AssessmentAnalysisModel } from '@/lib/analysis-types'
 
 const f1 = (n: number | null | undefined) => (n === null || n === undefined ? '—' : n.toFixed(1))
@@ -99,6 +99,7 @@ export default function AnalysisExplorer({ analysis, streamId }: { analysis: Ass
         {analysis.learningAreas.length === 0 ? (
           <p className="text-sm text-slate-500">No learning areas are configured for this Assessment and Grade.</p>
         ) : (
+        <>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div>
               <p className="text-xs font-semibold text-slate-500 mb-2">Mean % by Learning Area</p>
@@ -138,9 +139,14 @@ export default function AnalysisExplorer({ analysis, streamId }: { analysis: Ass
                 </table>
               </div>
             </div>
-          </div>
-        )}
-      </section>
+        </div>
+        <div className="mt-8">
+          <p className="text-xs font-semibold text-slate-500 mb-2">Level Distribution by Learning Area</p>
+          <LearningAreaLevelBars items={analysis.learningAreaResults} />
+        </div>
+        </>
+      )}
+    </section>
 
       {/* Insights */}
       {analysis.insights.length > 0 ? (
