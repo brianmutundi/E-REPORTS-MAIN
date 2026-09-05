@@ -49,8 +49,6 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const openingDate = termRowDates.opening_date
   const closingDate = termRowDates.closing_date
   const storedDatesValid = !openingDate || !closingDate || openingDate < closingDate
-  // A legacy/reversed date pair belongs only to this authenticated tenant.
-  // Do not let it be submitted unchanged, and never use another tenant's dates.
   const formOpeningDate = storedDatesValid ? openingDate : null
   const formClosingDate = storedDatesValid ? closingDate : null
   const currentClosingDate = effectiveDates.closingDate
@@ -75,7 +73,6 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const classTeacherName = (classes?.find(c => c.id === params.class) as any)?.teacher_name ?? null
   const classPrincipalName = (classes?.find(c => c.id === params.class) as any)?.principal_name ?? null
   const batchHref = hasSelection ? `/api/reports/pdf?exam=${params.exam}&class=${params.class}${params.stream ? `&stream=${params.stream}` : ''}` : '#'
-  const transcriptBatchHref = hasSelection ? `/api/transcript/pdf?class=${params.class}${params.stream ? `&stream=${params.stream}` : ''}` : '#'
 
   const scoreLabels = [
     { active: template.assessmentComponents.midTerm, label: 'Mid Term' },
@@ -145,9 +142,8 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, flexWrap: 'wrap', marginBottom: 16 }}>
           <div><div className="eyebrow">{exam?.name ?? 'Examination'}</div><h2 style={{ margin: '4px 0', fontSize: 20 }}>{className ?? 'Grade'} — Student Reports</h2><p className="muted">{results.length} student{results.length === 1 ? '' : 's'} found. Configured: {template.assessmentComponents.midTerm ? 'Mid Term ' : ''}{template.assessmentComponents.endTerm ? 'End Term ' : ''}{template.assessmentComponents.average ? 'Score' : ''}</p></div>
           {results.length > 0 && <a className="btn" href={batchHref} download>{hasStreams ? 'Generate Batch PDF' : 'Generate Grade PDF'}</a>}
-          {results.length > 0 && <a className="btn secondary" href={transcriptBatchHref} download>Transcript PDF</a>}
         </div>
-        {results.length === 0 ? <div className="notice error">No students were found in the selected grade.</div> : <div style={{ display: 'grid', gap: 10 }}>{results.map(student => <div key={student.studentId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '14px 16px', border: '1px solid #e2e8f0', borderRadius: 12, background: params.student === student.studentId ? '#f8fafc' : 'white', flexWrap: 'wrap' }}><div style={{ minWidth: 0, flex: '1 1 250px' }}><div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', fontFamily: 'monospace' }}>{student.admissionNo}</div><div style={{ fontWeight: 700, color: '#0f172a', marginTop: 3 }}>{student.fullName}</div></div><div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}><span style={{ display: 'inline-flex', alignItems: 'center', padding: '5px 9px', borderRadius: 999, fontSize: 12, fontWeight: 700, background: student.complete ? '#ecfdf5' : '#fff7ed', color: student.complete ? '#047857' : '#c2410c' }}>{student.complete ? 'Complete' : 'Incomplete'}</span><Link className="btn secondary" href={`/dashboard/reports?exam=${params.exam}&class=${params.class}${params.stream ? `&stream=${params.stream}` : ''}&student=${student.studentId}`}>View Report</Link><Link className="btn secondary" href={`/api/transcript/pdf?class=${params.class}&student=${student.studentId}`} target="_blank">Transcript</Link></div></div>)}</div>}
+        {results.length === 0 ? <div className="notice error">No students were found in the selected grade.</div> : <div style={{ display: 'grid', gap: 10 }}>{results.map(student => <div key={student.studentId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '14px 16px', border: '1px solid #e2e8f0', borderRadius: 12, background: params.student === student.studentId ? '#f8fafc' : 'white', flexWrap: 'wrap' }}><div style={{ minWidth: 0, flex: '1 1 250px' }}><div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', fontFamily: 'monospace' }}>{student.admissionNo}</div><div style={{ fontWeight: 700, color: '#0f172a', marginTop: 3 }}>{student.fullName}</div></div><div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}><span style={{ display: 'inline-flex', alignItems: 'center', padding: '5px 9px', borderRadius: 999, fontSize: 12, fontWeight: 700, background: student.complete ? '#ecfdf5' : '#fff7ed', color: student.complete ? '#047857' : '#c2410c' }}>{student.complete ? 'Complete' : 'Incomplete'}</span><Link className="btn secondary" href={`/dashboard/reports?exam=${params.exam}&class=${params.class}${params.stream ? `&stream=${params.stream}` : ''}&student=${student.studentId}`}>View Report</Link></div></div>)}</div>}
         <SmsSendQueue items={smsItems} />
       </section>
     )}
