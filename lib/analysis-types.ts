@@ -34,7 +34,7 @@ export function levelColor(code: string): string {
 
 export type AnalysisScope = {
   schoolName: string
-  schoolCode: string | null
+  schoolCode?: string | null
   schoolAddress: string | null
   schoolLogoUrl: string | null
   gradeId: string
