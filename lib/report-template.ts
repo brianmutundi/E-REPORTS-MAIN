@@ -1,23 +1,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
-export type AssessmentComponents = {
-  midTerm: boolean
-  endTerm: boolean
-  average: boolean
-}
-
+export type AssessmentComponents = { midTerm: boolean; endTerm: boolean; average: boolean }
 export const REPORT_TEMPLATE_KEYS = ['standard', 'cbc_4level'] as const
 export type ReportTemplateKey = (typeof REPORT_TEMPLATE_KEYS)[number]
-
-export const REPORT_TEMPLATE_LABELS: Record<ReportTemplateKey, string> = {
-  standard: 'Standard Assessment Report',
-  cbc_4level: 'CBC 4-Level Assessment Report',
-}
-
-export function validTemplateKey(value: unknown): value is ReportTemplateKey {
-  return REPORT_TEMPLATE_KEYS.some((key) => key === value)
-}
-
+export const REPORT_TEMPLATE_LABELS: Record<ReportTemplateKey, string> = { standard: 'Standard Assessment Report', cbc_4level: 'CBC 4-Level Assessment Report' }
+export function validTemplateKey(value: unknown): value is ReportTemplateKey { return REPORT_TEMPLATE_KEYS.some((key) => key === value) }
 export type ReportTemplate = {
   school: { name: boolean; logo: boolean; contact: boolean }
   student: { name: boolean; admissionNo: boolean; className: boolean; stream: boolean }
@@ -26,73 +13,20 @@ export type ReportTemplate = {
   additional: { teacherComment: boolean; overallComment: boolean; signatureArea: boolean }
   assessmentComponents: AssessmentComponents
 }
-
-export const defaultAssessmentComponents: AssessmentComponents = {
-  midTerm: false,
-  endTerm: true,
-  average: true,
-}
-
+export const defaultAssessmentComponents: AssessmentComponents = { midTerm: false, endTerm: true, average: true }
 export const defaultReportTemplate: ReportTemplate = {
-  school: { name: true, logo: true, contact: false },
-  student: { name: true, admissionNo: true, className: true, stream: false },
-  examination: { name: true, academicYear: true, term: true },
-  results: { learningArea: true, marks: true, grade: true, gradeDescription: true, total: true, average: true },
-  additional: { teacherComment: false, overallComment: false, signatureArea: true },
-  assessmentComponents: defaultAssessmentComponents,
+  school: { name: true, logo: true, contact: false }, student: { name: true, admissionNo: true, className: true, stream: false }, examination: { name: true, academicYear: true, term: true }, results: { learningArea: true, marks: true, grade: true, gradeDescription: true, total: true, average: true }, additional: { teacherComment: false, overallComment: false, signatureArea: true }, assessmentComponents: defaultAssessmentComponents,
 }
-
-function bool(value: unknown, fallback: boolean) {
-  return typeof value === 'boolean' ? value : fallback
-}
-
-export function normalizeAssessmentComponents(value: unknown): AssessmentComponents {
-  const v = (value && typeof value === 'object' ? value : {}) as Record<string, unknown>
-  return {
-    midTerm: bool(v.midTerm, defaultAssessmentComponents.midTerm),
-    endTerm: bool(v.endTerm, defaultAssessmentComponents.endTerm),
-    average: bool(v.average, defaultAssessmentComponents.average),
-  }
-}
-
-export function normalizeReportTemplate(value: unknown): ReportTemplate {
-  const v = (value && typeof value === 'object' ? value : {}) as Record<string, any>
-  return {
-    school: { name: bool(v.school?.name, true), logo: bool(v.school?.logo, true), contact: bool(v.school?.contact, false) },
-    student: { name: bool(v.student?.name, true), admissionNo: bool(v.student?.admissionNo, true), className: bool(v.student?.className, true), stream: bool(v.student?.stream, false) },
-    examination: { name: bool(v.examination?.name, true), academicYear: bool(v.examination?.academicYear, true), term: bool(v.examination?.term, true) },
-    results: { learningArea: bool(v.results?.learningArea, true), marks: bool(v.results?.marks, true), grade: bool(v.results?.grade, true), gradeDescription: bool(v.results?.gradeDescription, true), total: bool(v.results?.total, true), average: bool(v.results?.average, true) },
-    additional: { teacherComment: bool(v.additional?.teacherComment, false), overallComment: bool(v.additional?.overallComment, false), signatureArea: bool(v.additional?.signatureArea, true) },
-    assessmentComponents: normalizeAssessmentComponents(v.assessmentComponents),
-  }
-}
-
+function bool(value: unknown, fallback: boolean) { return typeof value === 'boolean' ? value : fallback }
+export function normalizeAssessmentComponents(value: unknown): AssessmentComponents { const v = (value && typeof value === 'object' ? value : {}) as Record<string, unknown>; return { midTerm: bool(v.midTerm, false), endTerm: bool(v.endTerm, true), average: bool(v.average, true) } }
+export function normalizeReportTemplate(value: unknown): ReportTemplate { const v = (value && typeof value === 'object' ? value : {}) as Record<string, any>; return { school: { name: bool(v.school?.name, true), logo: bool(v.school?.logo, true), contact: bool(v.school?.contact, false) }, student: { name: bool(v.student?.name, true), admissionNo: bool(v.student?.admissionNo, true), className: bool(v.student?.className, true), stream: bool(v.student?.stream, false) }, examination: { name: bool(v.examination?.name, true), academicYear: bool(v.examination?.academicYear, true), term: bool(v.examination?.term, true) }, results: { learningArea: bool(v.results?.learningArea, true), marks: bool(v.results?.marks, true), grade: bool(v.results?.grade, true), gradeDescription: bool(v.results?.gradeDescription, true), total: bool(v.results?.total, true), average: bool(v.results?.average, true) }, additional: { teacherComment: bool(v.additional?.teacherComment, false), overallComment: bool(v.additional?.overallComment, false), signatureArea: bool(v.additional?.signatureArea, true) }, assessmentComponents: normalizeAssessmentComponents(v.assessmentComponents) } }
 export const templateFields: { section: keyof Omit<ReportTemplate, 'assessmentComponents'>; key: string; label: string }[] = [
-  { section: 'school', key: 'name', label: 'School name' },
-  { section: 'school', key: 'logo', label: 'School logo' },
-  { section: 'school', key: 'contact', label: 'School contact details (P.O Box / address)' },
-  { section: 'student', key: 'name', label: 'Student name' },
-  { section: 'student', key: 'admissionNo', label: 'Admission number' },
-  { section: 'student', key: 'className', label: 'Grade' },
-  { section: 'student', key: 'stream', label: 'Stream' },
-  { section: 'examination', key: 'name', label: 'Examination name' },
-  { section: 'examination', key: 'academicYear', label: 'Academic year' },
-  { section: 'examination', key: 'term', label: 'Term / period' },
-  { section: 'results', key: 'learningArea', label: 'Learning area' },
-  { section: 'results', key: 'grade', label: 'Level (grade)' },
-  { section: 'results', key: 'gradeDescription', label: 'Grade description' },
-  { section: 'results', key: 'total', label: 'Total' },
-  { section: 'results', key: 'average', label: 'Average / mean' },
-  { section: 'additional', key: 'teacherComment', label: 'Grade class teacher remark' },
-  { section: 'additional', key: 'overallComment', label: 'Principal remark' },
-  { section: 'additional', key: 'signatureArea', label: 'Signature area' },
+  { section: 'school', key: 'name', label: 'School name' }, { section: 'school', key: 'logo', label: 'School logo' }, { section: 'school', key: 'contact', label: 'School contact details (P.O Box / address)' }, { section: 'student', key: 'name', label: 'Student name' }, { section: 'student', key: 'admissionNo', label: 'Admission number' }, { section: 'student', key: 'className', label: 'Grade' }, { section: 'student', key: 'stream', label: 'Stream' }, { section: 'examination', key: 'name', label: 'Examination name' }, { section: 'examination', key: 'academicYear', label: 'Academic year' }, { section: 'examination', key: 'term', label: 'Term / period' }, { section: 'results', key: 'learningArea', label: 'Learning area' }, { section: 'results', key: 'grade', label: 'Level (grade)' }, { section: 'results', key: 'gradeDescription', label: 'Grade description' }, { section: 'results', key: 'total', label: 'Total' }, { section: 'results', key: 'average', label: 'Average / mean' }, { section: 'additional', key: 'teacherComment', label: 'Grade class teacher remark' }, { section: 'additional', key: 'overallComment', label: 'Principal remark' }, { section: 'additional', key: 'signatureArea', label: 'Signature area' },
 ]
-
-export type ReportTenant = { name: string; code: string | null; logo_url: string | null; address: string | null }
-
+export type ReportTenant = { name: string; logo_url: string | null; address: string | null }
 export async function getReportTenant(supabase: SupabaseClient, tenantId: string): Promise<ReportTenant | null> {
-  const { data, error } = await supabase.from('tenants').select('name,code,logo_url,address').eq('id', tenantId).maybeSingle()
+  const { data, error } = await supabase.from('tenants').select('name,logo_url,address').eq('id', tenantId).maybeSingle()
   if (!error && data) return data as ReportTenant
-  const { data: basic } = await supabase.from('tenants').select('name,code,logo_url').eq('id', tenantId).maybeSingle()
+  const { data: basic } = await supabase.from('tenants').select('name,logo_url').eq('id', tenantId).maybeSingle()
   return basic ? { ...basic, address: null } : null
 }
