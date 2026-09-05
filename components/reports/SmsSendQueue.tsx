@@ -16,13 +16,14 @@ function buildParentMessage(item: SmsItem) {
   const lines = item.message.split('\n').map(line => line.trim()).filter(Boolean)
   const overallIndex = lines.findIndex(line => /^Overall:/i.test(line))
   const header = lines[0] ?? ''
+  const schoolName = header.split(' · ')[0] || 'School'
   const subjectLines = overallIndex >= 0 ? lines.slice(1, overallIndex) : lines.slice(1)
   const overall = overallIndex >= 0 ? lines[overallIndex] : ''
   const isMidTerm = /mid[ -]?term/i.test(header)
   const periodLabel = isMidTerm ? 'mid-term' : 'assessment'
   const guidance = overall
-    ? `Please encourage your child to maintain their strengths while continuing to work on areas that require improvement.`
-    : `Please continue supporting your child’s learning and progress.`
+    ? 'Please encourage your child to maintain their strengths while continuing to work on areas that require improvement.'
+    : 'Please continue supporting your child’s learning and progress.'
 
   return [
     'Dear Parent/Guardian,',
@@ -41,7 +42,7 @@ function buildParentMessage(item: SmsItem) {
     '',
     'Thank you for your continued support and partnership in your child’s learning.',
     '',
-    'T SCHOOL',
+    schoolName,
     'Management',
   ].filter((line, index, all) => line !== '' || (index > 0 && index < all.length - 1)).join('\n')
 }
