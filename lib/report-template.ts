@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 export type AssessmentComponents = { midTerm: boolean; endTerm: boolean; average: boolean }
 export const REPORT_TEMPLATE_KEYS = ['standard', 'cbc_4level'] as const
@@ -25,6 +26,12 @@ export const templateFields: { section: keyof Omit<ReportTemplate, 'assessmentCo
 ]
 export type ReportTenant = { name: string; logo_url: string | null; address: string | null }
 export async function getReportTenant(supabase: SupabaseClient, tenantId: string): Promise<ReportTenant | null> {
+  try {
+    const admin = createAdminClient()
+    const { data, error } = await admin.from('tenants').select('name,logo_url,address').eq('id', tenantId).maybeSingle()
+    if (!error && data) return data as ReportTenant
+  } catch {}
+
   const { data, error } = await supabase.from('tenants').select('name,logo_url,address').eq('id', tenantId).maybeSingle()
   if (!error && data) return data as ReportTenant
   const { data: basic } = await supabase.from('tenants').select('name,logo_url').eq('id', tenantId).maybeSingle()
