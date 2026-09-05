@@ -91,8 +91,8 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
       const normalizedPhone = phone.replace(/[^0-9+]/g, '')
       const subjectLines = r.subjects.map(s => {
         const score = s.average ?? s.endTerm ?? s.midTerm
-        const grade = s.grade ?? ''
-        return `${s.subjectName}: ${score != null ? score.toFixed(1) : 'ABS'} (${grade})`
+        const grade = s.gradeDescription || s.grade || ''
+        return `${s.subjectName}: ${score != null ? score.toFixed(1) : 'ABS'}${grade ? ` (${grade})` : ''}`
       })
       const header = [tenant?.name, exam?.name, exam?.term, exam?.academic_year].filter(Boolean).join(' · ')
       const overall = r.overallLevel ? `Overall: ${r.overallLevel}${r.overallDescription ? ' - ' + r.overallDescription : ''}` : ''
