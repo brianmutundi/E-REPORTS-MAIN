@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { Document, renderToBuffer } from '@react-pdf/renderer'
 import { createClient } from '@/lib/supabase/server'
 import { limitAuthenticatedRoute } from '@/lib/rate-limit'
@@ -10,21 +10,27 @@ import { getEffectiveTermDates, parseTermReference, NEXT_TERM_OPENING_PLACEHOLDE
 
 export const runtime = 'nodejs'
 
-function reportErrorRedirect(request: NextRequest, message: string, status: number) {
-  const url = new URL('/dashboard/reports', request.url)
-  url.searchParams.set('error', `Assessment report generation failed|${message}`)
-  url.searchParams.set('status', String(status))
-  return NextResponse.redirect(url, 303)
+function reportError(message: string, status: number) {
+  return Response.json(
+    { error: message },
+    {
+      status,
+      headers: {
+        'Cache-Control': 'no-store',
+        'X-Content-Type-Options': 'nosniff',
+      },
+    },
+  )
 }
 
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return reportErrorRedirect(request, 'Please sign in again.', 401)
+    if (!user) return reportError('Please sign in again.', 401)
 
     const { data: profile } = await supabase.from('profiles').select('tenant_id').eq('id', user.id).single()
-    if (!profile?.tenant_id) return reportErrorRedirect(request, 'No school is linked to this account.', 403)
+    if (!profile?.tenant_id) return reportError('No school is linked to this account.', 403)
 
     const throttled = limitAuthenticatedRoute(request.headers, user.id, 'reports-pdf', 30)
     if (throttled) return throttled
@@ -34,7 +40,7 @@ export async function GET(request: NextRequest) {
     const classId = url.searchParams.get('class')
     const studentId = url.searchParams.get('student')
     const streamId = url.searchParams.get('stream')?.trim() || undefined
-    if (!examId || !classId) return reportErrorRedirect(request, 'An assessment and grade are required.', 400)
+    if (!examId || !classId) return reportError('An assessment and grade are required.', 400)
 
     const clsRes = await supabase.from('classes').select('id,name,teacher_name,principal_name').eq('id', classId).eq('tenant_id', profile.tenant_id).maybeSingle()
     const cls = clsRes.error
@@ -53,7 +59,7 @@ export async function GET(request: NextRequest) {
     }
 
     const tenant = await getReportTenant(supabase, profile.tenant_id)
-    if (!exam || !cls || !tenant) return reportErrorRedirect(request, 'The selected assessment or grade could not be found.', 404)
+    if (!exam || !cls || !tenant) return reportError('The selected assessment or grade could not be found.', 404)
 
     const scope = {
       className: cls.name,
@@ -65,10 +71,10 @@ export async function GET(request: NextRequest) {
     const templateKey: ReportTemplateKey = validTemplateKey(rowKey) ? rowKey : REPORT_TEMPLATE_KEYS[0]
     const gradingScale = await getTenantGradingScale(profile.tenant_id)
     const configured = await getConfiguredAssessmentResults(examId, classId, template.assessmentComponents, streamId)
-    if (configured.error) return reportErrorRedirect(request, configured.error, 409)
+    if (configured.error) return reportError(configured.error, 409)
 
     const selected = studentId ? configured.rows.filter(r => r.studentId === studentId) : configured.rows
-    if (!selected.length) return reportErrorRedirect(request, 'No report data was found for the selected context.', 404)
+    if (!selected.length) return reportError('No report data was found for the selected context.', 404)
 
     const [{ data: config }, { data: teacherRows }, { data: principalRows }] = templateRow?.id ? await Promise.all([
       supabase.from('report_template_configs').select('teacher_remarks_enabled,principal_remarks_enabled').eq('report_template_id', templateRow.id).maybeSingle(),
@@ -108,7 +114,7 @@ export async function GET(request: NextRequest) {
     )
     const body = new Uint8Array(rendered)
 
-    // Do not allow an HTML/text renderer failure to masquerade as a PDF download.
+    // A successful endpoint response must be a real PDF, never HTML/text.
     const pdfSignature = new TextDecoder().decode(body.slice(0, 5))
     if (pdfSignature !== '%PDF-') {
       console.error('Assessment report renderer returned a non-PDF payload', {
@@ -120,7 +126,7 @@ export async function GET(request: NextRequest) {
         byteLength: body.byteLength,
         signature: pdfSignature,
       })
-      return reportErrorRedirect(request, 'The report renderer did not produce a valid PDF.', 500)
+      return reportError('The report renderer did not produce a valid PDF.', 500)
     }
 
     const filename = studentId
@@ -134,10 +140,11 @@ export async function GET(request: NextRequest) {
         'Content-Disposition': `attachment; filename="${filename}"`,
         'Content-Length': String(body.byteLength),
         'Cache-Control': 'no-store',
+        'X-Content-Type-Options': 'nosniff',
       },
     })
   } catch (error) {
     console.error('Assessment report PDF generation failed', error)
-    return reportErrorRedirect(request, 'The assessment report could not be generated. Check the server PDF-generation error and try again.', 500)
+    return reportError('The assessment report could not be generated. Please try again.', 500)
   }
 }
