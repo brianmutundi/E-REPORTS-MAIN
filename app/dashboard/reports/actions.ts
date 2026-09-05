@@ -9,7 +9,7 @@ import { defaultReportTemplate, validTemplateKey } from '@/lib/report-template'
 /**
  * Assessment Report dates are independent report-period settings.
  * They are intentionally NOT linked to the school's `terms` calendar.
- * The only date invariant is: opening_date < closing_date.
+ * For the Assessment Report period, the closing date must be before the opening date.
  */
 export async function saveReportSettings(formData: FormData) {
   const { supabase, user, tenantId } = await getDashboardSession()
@@ -21,8 +21,8 @@ export async function saveReportSettings(formData: FormData) {
   const templateKey = String(formData.get('template_key') || '').trim()
   const finalTemplateKey = validTemplateKey(templateKey) ? templateKey : 'standard'
 
-  if (opening && closing && opening >= closing) {
-    redirect('/dashboard/reports?error=' + encodeURIComponent('Invalid date range|The opening date must be before the closing date.'))
+  if (opening && closing && closing >= opening) {
+    redirect('/dashboard/reports?error=' + encodeURIComponent('Invalid date range|The closing date must be before the opening date.'))
   }
 
   const { data: existing } = await supabase
