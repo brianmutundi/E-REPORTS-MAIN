@@ -6,15 +6,19 @@ export type AssessmentComponents = {
   average: boolean
 }
 
+/** Active report templates. The legacy html_custom key is intentionally not selectable. */
 export const REPORT_TEMPLATE_KEYS = ['standard', 'cbc_4level'] as const
-export type ReportTemplateKey = (typeof REPORT_TEMPLATE_KEYS)[number]
+export type ReportTemplateKey = (typeof REPORT_TEMPLATE_KEYS)[number] | 'html_custom'
+type ActiveReportTemplateKey = (typeof REPORT_TEMPLATE_KEYS)[number]
 
 export const REPORT_TEMPLATE_LABELS: Record<ReportTemplateKey, string> = {
   standard: 'Standard Assessment Report',
   cbc_4level: 'CBC 4-Level Assessment Report',
+  html_custom: 'Legacy Custom HTML (disabled)',
 }
 
-export function validTemplateKey(value: unknown): value is ReportTemplateKey {
+/** Only active templates are valid for new or updated report settings. */
+export function validTemplateKey(value: unknown): value is ActiveReportTemplateKey {
   return REPORT_TEMPLATE_KEYS.some((key) => key === value)
 }
 
