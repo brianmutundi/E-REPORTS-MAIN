@@ -28,7 +28,7 @@ async function saveSubject(formData: FormData) {
   }
   const result = id ? await supabase.from('subjects').update({ name, code }).eq('id', id).eq('tenant_id', tenantId) : await supabase.from('subjects').insert({ name, code, tenant_id: tenantId })
   if (result.error) redirect('/dashboard/subjects?error=' + encodeURIComponent(friendlyDbRedirect(result.error)))
-  revalidatePath('/dashboard/subjects'); revalidatePath('/dashboard/marks'); revalidatePath('/dashboard/results'); redirect('/dashboard/subjects?saved=1')
+  revalidatePath('/dashboard/subjects'); revalidatePath('/dashboard/marks'); revalidatePath('/dashboard/broadsheets'); redirect('/dashboard/subjects?saved=1')
 }
 async function deleteSubject(formData: FormData) {
   'use server'

@@ -78,7 +78,7 @@ if (error) {
 
   revalidatePath('/dashboard/examinations')
   revalidatePath('/dashboard/marks')
-  revalidatePath('/dashboard/results')
+  revalidatePath('/dashboard/broadsheets')
 
   redirect('/dashboard/examinations?saved=1')
 }
@@ -102,7 +102,7 @@ async function deleteExam(formData: FormData) {
 
   revalidatePath('/dashboard/examinations')
   revalidatePath('/dashboard/marks')
-  revalidatePath('/dashboard/results')
+  revalidatePath('/dashboard/broadsheets')
 
   redirect('/dashboard/examinations?deleted=1')
 }

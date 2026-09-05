@@ -64,7 +64,7 @@ per-subject 0–100 plus an optional totals overlay. This feature introduces the
 | `lib/analysis-types.ts` | 6–23 | `LEVEL_COLOR`, `LEVEL_DEFAULT` | Keyed only EE/ME/AE/BE; extend to 8 codes + make color assignment config/order-driven |
 | `lib/analysis.ts` | 235–239 | fallback + `['EE','ME','AE','BE']` order | Replace with data from active grading config |
 | `app/dashboard/grading/page.tsx` | 8–25 | `DEFAULT_LEVELS`, `DEFAULT_TOTAL_LEVELS` | Replaced by KNEC/mode defaults from the config engine |
-| `app/dashboard/reports/template/page.tsx` | 53 | static preview text `ME`/`BE` | Keep as illustrative preview, or derive from live scale |
+| `app/dashboard/reports/template/page.tsx` | 53 | static preview text `ME`/`BE` | Removed in the reporting & assessment navigation refactor — no longer generated |
 
 All runtime **consumers** (`lib/results.ts`, `lib/analysis.ts`, PDF routes, results/reports/analysis
 pages) already call `getTenantGradingScale`/`getTotalLevel` and carry **no** hardcoded levels, so

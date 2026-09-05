@@ -87,8 +87,8 @@ export default async function MarksPage({ searchParams }: { searchParams: Promis
       {/* Header Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-5">
         <div>
-          <p className="eyebrow">Assessment Entry</p>
-          <h1 className="title">Marks Entry Matrix</h1>
+          <p className="eyebrow">Assessment scores</p>
+          <h1 className="title">Assessment Scores</h1>
         </div>
 
         <div className="flex flex-wrap gap-2 self-start sm:self-auto">
@@ -97,7 +97,7 @@ export default async function MarksPage({ searchParams }: { searchParams: Promis
             className="btn secondary"
           >
             <Upload className="h-4 w-4" />
-            <span>Bulk Import Results</span>
+            <span>Bulk Import Scores</span>
           </Link>
           <Link
             href="/dashboard/examinations/assign"
@@ -118,7 +118,7 @@ export default async function MarksPage({ searchParams }: { searchParams: Promis
       )}
 
       {params.saved && (
-        <SuccessToast message="Marks saved successfully" />
+        <SuccessToast message="Scores saved successfully" />
       )}
 
       {params.conflicts && (() => {
@@ -190,7 +190,7 @@ export default async function MarksPage({ searchParams }: { searchParams: Promis
         </div>
       )}
 
-      {/* Marks Entry Card */}
+      {/* Scores Entry Card */}
       {params.exam && params.class && params.subject && gradeValid && (
         <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
           <div className="p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-slate-50/50">

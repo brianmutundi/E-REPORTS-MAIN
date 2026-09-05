@@ -7,8 +7,11 @@ import { getScopeStreams, getScopeExams, type ScopeExam } from '@/lib/scope'
 import PrintButton from '@/components/PrintButton'
 import CascadingFilterBar from '@/components/CascadingFilterBar'
 import ScrollToReport from '@/components/ScrollToReport'
+import SuccessToast from '@/components/SuccessToast'
+import SubmitButton from '@/components/SubmitButton'
+import { saveReportPeriod } from './actions'
 
-export default async function ReportsPage({ searchParams }: { searchParams: Promise<{ exam?: string; class?: string; student?: string; stream?: string }> }) {
+export default async function ReportsPage({ searchParams }: { searchParams: Promise<{ exam?: string; class?: string; student?: string; stream?: string; saved?: string; error?: string }> }) {
   const params = await searchParams
   const { supabase, user, tenantId } = await getDashboardSession()
   if (!user) return <main className="main"><p>Please sign in.</p></main>
@@ -33,11 +36,12 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const hasSelection = Boolean(params.exam && params.class && gradeValid)
   // Round 2 — the configured report detail (needs templateRow) and the heavy
   // computed results (needs template + class) are independent of each other.
+  const reportConfigPromise = templateRow?.id
+    ? supabase.from('report_template_configs').select('opening_date,closing_date').eq('report_template_id', templateRow.id).maybeSingle()
+    : Promise.resolve<{ data: { opening_date: string | null; closing_date: string | null } | null }>({ data: null })
   const [{ data: reportConfig }, configured, remarkBanks] = hasSelection
     ? await Promise.all([
-        templateRow?.id
-          ? supabase.from('report_template_configs').select('opening_date,closing_date').eq('report_template_id', templateRow.id).maybeSingle()
-          : Promise.resolve({ data: null }),
+        reportConfigPromise,
         getConfiguredAssessmentResults(params.exam!, params.class!, template.assessmentComponents, params.stream),
         templateRow?.id
           ? Promise.all([
@@ -46,7 +50,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
             ]).then(([teacher, principal]) => ({ teacher: teacher.data?.map(r => r.remark) ?? [], principal: principal.data?.map(r => r.remark) ?? [] }))
           : Promise.resolve({ teacher: [], principal: [] }),
       ])
-    : [{ data: null }, null, { teacher: [], principal: [] }]
+    : [{ data: (await reportConfigPromise).data }, null, { teacher: [], principal: [] }]
   const results = configured?.rows ?? []
   const teacherRemarks = remarkBanks?.teacher ?? []
   const principalRemarks = remarkBanks?.principal ?? []
@@ -68,7 +72,31 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const scoreHeader = (label: string) => (singleScoreColumn ? 'Score' : label)
 
   return <main className="main" style={{ maxWidth: 1120, margin: '0 auto' }}>
-    <div className="top no-print"><div><div className="eyebrow">Assessment reports</div><h1 className="title">Student Assessment Reports</h1><p className="muted">Select an examination and grade to view the configured report form.</p></div><div className="actions" style={{ marginTop: 0 }}><Link className="btn secondary" href="/dashboard/reports/template">Template</Link><Link className="btn secondary" href="/dashboard/results">Results</Link></div></div>
+    <div className="top no-print"><div><div className="eyebrow">Assessment reports</div><h1 className="title">Student Assessment Reports</h1><p className="muted">Set the term dates for this school and select an examination and grade to view the report form.</p></div></div>
+
+    {params.error && (() => { const idx = params.error.indexOf('|'); return idx > -1 ? <div className="notice error no-print" style={{ marginTop: 16 }}><span className="font-semibold">{params.error.slice(0, idx)}</span><span className="block text-xs opacity-80 mt-0.5">{params.error.slice(idx + 1)}</span></div> : <div className="notice error no-print" style={{ marginTop: 16 }}>{params.error}</div> })()}
+    {params.saved && <SuccessToast message="Report period saved" />}
+
+    <section className="card no-print" style={{ marginTop: 20 }}>
+      <div className="section-heading">
+        <div>
+          <h2 className="section-title">Report period</h2>
+          <p className="muted">These opening and closing dates are stored with the report template and appear on generated reports.</p>
+        </div>
+      </div>
+      <form action={saveReportPeriod}>
+        <input type="hidden" name="exam" value={params.exam ?? ''} />
+        <input type="hidden" name="class" value={params.class ?? ''} />
+        <input type="hidden" name="stream" value={params.stream ?? ''} />
+        <div className="form-grid">
+          <label className="field-label">Opening date<input type="date" name="opening_date" defaultValue={openingDate ?? ''} /></label>
+          <label className="field-label">Closing date<input type="date" name="closing_date" defaultValue={closingDate ?? ''} /></label>
+        </div>
+        <div className="actions-inline" style={{ marginTop: 14 }}>
+          <SubmitButton>Save report period</SubmitButton>
+        </div>
+      </form>
+    </section>
 
     <div className="card no-print">
       <CascadingFilterBar

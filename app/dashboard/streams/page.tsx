@@ -37,7 +37,7 @@ async function deleteStream(formData: FormData) {
   const unstream = await supabase.from('students').update({ stream_id: null }).eq('tenant_id', tenantId).eq('stream_id', id)
   if (unstream.error && unstream.error.code === '42703') { /* stream_id column not applied yet */ }
   await supabase.from('streams').delete().eq('id', id).eq('tenant_id', tenantId)
-  revalidatePath('/dashboard/streams'); revalidatePath('/dashboard/students'); revalidatePath('/dashboard/results'); revalidatePath('/dashboard/analysis')
+  revalidatePath('/dashboard/streams'); revalidatePath('/dashboard/students'); revalidatePath('/dashboard/broadsheets'); revalidatePath('/dashboard/analysis')
   redirect('/dashboard/streams?deleted=1')
 }
 

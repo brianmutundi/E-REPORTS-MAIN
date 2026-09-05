@@ -1,15 +1,19 @@
 ﻿import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
-import Link from 'next/link'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { getDashboardSession } from '@/lib/supabase/session'
 import SuccessToast from '@/components/SuccessToast'
 import { friendlyDbRedirect } from '@/lib/db-errors'
 import { knecDefaultLevels, type GradingMode, type GradeRule } from '@/lib/grading'
+import { defaultReportTemplate } from '@/lib/report-template'
 import GradingModeChooser from '@/components/grading/GradingModeChooser'
 import SubmitButton from '@/components/SubmitButton'
 
 const VALID_CODES_8 = ['EE1', 'EE2', 'ME1', 'ME2', 'AE1', 'AE2', 'BE1', 'BE2']
 const VALID_CODES_4 = ['EE', 'ME', 'AE', 'BE']
+
+const DEFAULT_TEACHER_REMARKS = ['Excellent progress', 'Very good progress', 'Good progress', 'Needs improvement']
+const DEFAULT_PRINCIPAL_REMARKS = ['Promoted to the next level', 'Keep up the good work', 'Continue working hard', 'Needs closer support']
 
 type LevelInput = { code: string; min: number; max: number; points: number | null; name: string; description: string; broad: string | null; sort_order: number }
 
@@ -94,6 +98,45 @@ function validateLevels(rows: LevelInput[], mode: GradingMode): string | null {
   return null
 }
 
+/**
+ * Persists the school's authoritative grade class teacher + principal remark bank
+ * (exactly 4 of each) keyed by the default report template. Reuses the existing
+ * report_template_configs / report_teacher_remarks / report_principal_remarks
+ * structures — no new tables. Returns a friendly error message or null on success.
+ */
+async function persistRemarks(supabase: SupabaseClient, tenantId: string, teacher: string[], principal: string[]): Promise<string | null> {
+  let { data: template } = await supabase.from('report_templates').select('id').eq('tenant_id', tenantId).eq('is_default', true).maybeSingle()
+  let templateId = template?.id
+  if (!templateId) {
+    const { data: created, error } = await supabase
+      .from('report_templates')
+      .insert({ tenant_id: tenantId, name: 'Default Report Form', template_json: defaultReportTemplate, is_default: true })
+      .select('id')
+      .single()
+    if (error || !created) return friendlyDbRedirect(error) || 'Could not create the report template.'
+    templateId = created.id
+  }
+  const { error: configError } = await supabase
+    .from('report_template_configs')
+    .upsert({ tenant_id: tenantId, report_template_id: templateId, teacher_remarks_enabled: true, principal_remarks_enabled: true }, { onConflict: 'report_template_id' })
+  if (configError) return friendlyDbRedirect(configError) || 'Could not save remark settings.'
+  const deletes = await Promise.all([
+    supabase.from('report_teacher_remarks').delete().eq('report_template_id', templateId),
+    supabase.from('report_principal_remarks').delete().eq('report_template_id', templateId),
+  ])
+  if (deletes[0].error) return friendlyDbRedirect(deletes[0].error) || 'Could not save teacher remarks.'
+  if (deletes[1].error) return friendlyDbRedirect(deletes[1].error) || 'Could not save principal remarks.'
+  const { error: teacherError } = await supabase
+    .from('report_teacher_remarks')
+    .insert(teacher.map((remark, i) => ({ tenant_id: tenantId, report_template_id: templateId, remark, sort_order: i })))
+  if (teacherError) return friendlyDbRedirect(teacherError) || 'Could not save teacher remarks.'
+  const { error: principalError } = await supabase
+    .from('report_principal_remarks')
+    .insert(principal.map((remark, i) => ({ tenant_id: tenantId, report_template_id: templateId, remark, sort_order: i })))
+  if (principalError) return friendlyDbRedirect(principalError) || 'Could not save principal remarks.'
+  return null
+}
+
 async function selectMode(mode02: '4' | '8'): Promise<void> {
   'use server'
   const { supabase, user, tenantId } = await getDashboardSession()
@@ -113,10 +156,9 @@ async function selectMode(mode02: '4' | '8'): Promise<void> {
     redirect('/dashboard/grading?error=' + encodeURIComponent(friendlyDbRedirect(error)))
   }
   revalidatePath('/dashboard/grading')
-  revalidatePath('/dashboard/results')
+  revalidatePath('/dashboard/broadsheets')
   revalidatePath('/dashboard/reports')
   revalidatePath('/dashboard/analysis')
-  revalidatePath('/dashboard/reports/template')
 }
 
 async function saveGrading(formData: FormData) {
@@ -128,6 +170,11 @@ async function saveGrading(formData: FormData) {
   const rows = parseLevels(formData, mode)
   const problem = validateLevels(rows, mode)
   if (problem) redirect('/dashboard/grading?error=' + encodeURIComponent('Unable to save grading configuration|' + problem))
+
+  const teacherRemarks = Array.from({ length: 4 }, (_, i) => String(formData.get(`teacher_${i}`) || '').trim())
+  const principalRemarks = Array.from({ length: 4 }, (_, i) => String(formData.get(`principal_${i}`) || '').trim())
+  if (teacherRemarks.some((r) => !r)) redirect('/dashboard/grading?error=' + encodeURIComponent('Unable to save grading configuration|All 4 grade class teacher remarks are required.'))
+  if (principalRemarks.some((r) => !r)) redirect('/dashboard/grading?error=' + encodeURIComponent('Unable to save grading configuration|All 4 principal remarks are required.'))
 
   const pLevels = rows.map((r) => ({
     code: r.code, min_percent: r.min, max_percent: r.max, points: r.points,
@@ -152,11 +199,14 @@ async function saveGrading(formData: FormData) {
       .insert(pLevels.map((l) => ({ config_id: created.id, ...l })))
     if (lvlErr) redirect('/dashboard/grading?error=' + encodeURIComponent(friendlyDbRedirect(lvlErr) || 'Could not save grading configuration'))
   }
+
+  const remarkError = await persistRemarks(supabase, tenantId, teacherRemarks, principalRemarks)
+  if (remarkError) redirect('/dashboard/grading?error=' + encodeURIComponent('Unable to save grading configuration|' + remarkError))
+
   revalidatePath('/dashboard/grading')
-  revalidatePath('/dashboard/results')
+  revalidatePath('/dashboard/broadsheets')
   revalidatePath('/dashboard/reports')
   revalidatePath('/dashboard/analysis')
-  revalidatePath('/dashboard/reports/template')
   redirect('/dashboard/grading?saved=1')
 }
 
@@ -221,22 +271,34 @@ export default async function GradingPage({ searchParams }: { searchParams: Prom
 
   const rows = Array.from({ length: mode === '8' ? 8 : 4 }, (_, i) => levels[i])
 
+  // The authoritative remark bank, keyed by the default report template. Falls back
+  // to the standard defaults until a school saves its own remarks.
+  let teacherRemarks: string[] = []
+  let principalRemarks: string[] = []
+  const { data: defTmpl } = await supabase.from('report_templates').select('id').eq('tenant_id', tenantId).eq('is_default', true).maybeSingle()
+  if (defTmpl?.id) {
+    const [{ data: t }, { data: p }] = await Promise.all([
+      supabase.from('report_teacher_remarks').select('remark,sort_order').eq('report_template_id', defTmpl.id).order('sort_order'),
+      supabase.from('report_principal_remarks').select('remark,sort_order').eq('report_template_id', defTmpl.id).order('sort_order'),
+    ])
+    teacherRemarks = t?.map((r) => r.remark) ?? []
+    principalRemarks = p?.map((r) => r.remark) ?? []
+  }
+  const teacherDefaults = teacherRemarks.length === 4 ? teacherRemarks : DEFAULT_TEACHER_REMARKS
+  const principalDefaults = principalRemarks.length === 4 ? principalRemarks : DEFAULT_PRINCIPAL_REMARKS
+
   return (
     <main className="main" style={{ maxWidth: 1080, margin: '0 auto' }}>
       <div className="top">
         <div>
           <div className="eyebrow">Academic setup</div>
           <h1 className="title">Achievement Grading System</h1>
-          <p className="muted">Choose how this school represents achievement levels. The selection controls how achievement is calculated and displayed throughout the school.</p>
-        </div>
-        <div className="actions-inline" style={{ marginTop: 0 }}>
-          <Link className="btn secondary" href="/dashboard/reports/template">Report template</Link>
-          <Link className="btn secondary" href="/dashboard/reports/template/configuration">Report configuration</Link>
+          <p className="muted">Choose how this school represents achievement levels and set the remarks shown on Assessment Reports. The selection controls how achievement is calculated and displayed throughout the school.</p>
         </div>
       </div>
 
       {params.error && (() => { const idx = params.error.indexOf('|'); return idx > -1 ? <div className="notice error"><span className="font-semibold">{params.error.slice(0, idx)}</span><span className="block text-xs opacity-80 mt-0.5">{params.error.slice(idx + 1)}</span></div> : <div className="notice error">{params.error}</div> })()}
-      {params.saved && <SuccessToast message="Grading configuration saved" />}
+      {params.saved && <SuccessToast message="Grading configuration and remarks saved" />}
       {(params.restored8 || params.restored4) && <SuccessToast message={params.restored8 ? 'Restored KNEC 8-level defaults' : 'Restored 4-level defaults'} />}
 
       <div style={{ marginBottom: 4 }}>
@@ -296,6 +358,43 @@ export default async function GradingPage({ searchParams }: { searchParams: Prom
         <p className="muted" style={{ marginTop: 12 }}>
           Ranges must fully cover 0–100 with no overlaps or gaps. Each value maps to exactly one level.
         </p>
+
+        <div className="section-heading" style={{ marginTop: 28, borderTop: '1px solid var(--line)', paddingTop: 20 }}>
+          <div>
+            <h2 className="section-title">Grade class teacher remarks</h2>
+            <p className="muted">Exactly 4 remarks, ordered best to worst. The remark matching each learner&apos;s overall level appears on Assessment Reports.</p>
+          </div>
+        </div>
+        <div className="table">
+          <div className="row header" style={{ gridTemplateColumns: '64px 1fr' }}>
+            <span>#</span><span>Remark</span>
+          </div>
+          {teacherDefaults.map((remark, i) => (
+            <div key={`teacher-${i}`} className="row" style={{ gridTemplateColumns: '64px 1fr' }}>
+              <span>{i + 1}</span>
+              <input name={`teacher_${i}`} aria-label={`Grade class teacher remark ${i + 1}`} defaultValue={remark} />
+            </div>
+          ))}
+        </div>
+
+        <div className="section-heading" style={{ marginTop: 28 }}>
+          <div>
+            <h2 className="section-title">Principal remarks</h2>
+            <p className="muted">Exactly 4 remarks, ordered best to worst. The remark matching each learner&apos;s overall level appears on Assessment Reports.</p>
+          </div>
+        </div>
+        <div className="table">
+          <div className="row header" style={{ gridTemplateColumns: '64px 1fr' }}>
+            <span>#</span><span>Remark</span>
+          </div>
+          {principalDefaults.map((remark, i) => (
+            <div key={`principal-${i}`} className="row" style={{ gridTemplateColumns: '64px 1fr' }}>
+              <span>{i + 1}</span>
+              <input name={`principal_${i}`} aria-label={`Principal remark ${i + 1}`} defaultValue={remark} />
+            </div>
+          ))}
+        </div>
+
         <div className="actions-inline" style={{ marginTop: 16 }}>
           <SubmitButton name="intent" value="save">Save Grading Configuration</SubmitButton>
         </div>

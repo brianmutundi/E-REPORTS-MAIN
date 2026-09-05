@@ -87,10 +87,10 @@ export default function ResultsImportWizard({ exams, classes, classIdsByExam }: 
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200 pb-5">
         <div>
           <p className="eyebrow">Bulk import</p>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight mt-0.5">Import Results</h1>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight mt-0.5">Import Scores</h1>
         </div>
         <Link href="/dashboard/marks" className="inline-flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-slate-900">
-          <ArrowLeft className="h-4 w-4" /> Back to Marks Entry
+          <ArrowLeft className="h-4 w-4" /> Back to Assessment Scores
         </Link>
       </div>
 
@@ -104,7 +104,7 @@ export default function ResultsImportWizard({ exams, classes, classIdsByExam }: 
       {step === 'context' && (
         <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6 space-y-4">
           <h2 className="text-base font-bold text-slate-900">1. Choose the academic context</h2>
-          <p className="text-sm text-slate-500">Marks are imported for one examination and one grade at a time. The grade must already be assigned to the examination.</p>
+          <p className="text-sm text-slate-500">Scores are imported for one assessment and one grade at a time. The grade must already be assigned to the examination.</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">Examination</label>
@@ -179,7 +179,7 @@ export default function ResultsImportWizard({ exams, classes, classIdsByExam }: 
           <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
             <div className="p-4 border-b border-slate-100 bg-slate-50/50">
               <h2 className="text-base font-bold text-slate-900">Preview</h2>
-              <p className="text-xs text-slate-500 mt-0.5">Marks with an existing record for this exam are flagged and skipped — they are never overwritten.</p>
+              <p className="text-xs text-slate-500 mt-0.5">Scores with an existing record for this exam are flagged and skipped — they are never overwritten.</p>
             </div>
             <div className="overflow-x-auto max-h-[420px]">
               <table className="w-full text-left text-sm text-slate-600">
@@ -232,7 +232,7 @@ export default function ResultsImportWizard({ exams, classes, classIdsByExam }: 
           </div>
           <div className="flex justify-center gap-3 pt-2">
             <button onClick={reset} className="btn secondary">Import more</button>
-            <Link href="/dashboard/results" className="btn">View results</Link>
+            <Link href="/dashboard/broadsheets" className="btn">View Broadsheet</Link>
           </div>
         </div>
       )}

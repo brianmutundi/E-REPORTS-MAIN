@@ -68,7 +68,7 @@ async function saveAssignments(formData: FormData) {
   revalidatePath('/dashboard/examinations')
   revalidatePath('/dashboard/marks')
   revalidatePath('/dashboard/marks/import')
-  revalidatePath('/dashboard/results')
+  revalidatePath('/dashboard/broadsheets')
   revalidatePath('/dashboard/reports')
   revalidatePath('/dashboard/analysis')
 }

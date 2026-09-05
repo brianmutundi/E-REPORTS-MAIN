@@ -1,6 +1,5 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
-import Link from 'next/link'
 import { getDashboardSession } from '@/lib/supabase/session'
 import SuccessToast from '@/components/SuccessToast'
 import SchoolLogoUploader from './logo-uploader'
@@ -48,7 +47,7 @@ async function createAcademicYear(formData: FormData) {
   revalidatePath('/dashboard/settings')
   revalidatePath('/dashboard/students')
   revalidatePath('/dashboard/marks')
-  revalidatePath('/dashboard/results')
+  revalidatePath('/dashboard/broadsheets')
   redirect(`/dashboard/settings?year_created=${encodeURIComponent(String(targetYear))}&promoted=${encodeURIComponent(String(summary?.promoted_count ?? 0))}&terminal=${encodeURIComponent(String(summary?.terminal_grade_count ?? 0))}&skipped=${encodeURIComponent(String(summary?.skipped_inactive_count ?? 0))}&existing=${encodeURIComponent(String(summary?.already_enrolled_count ?? 0))}`)
 }
 
@@ -69,7 +68,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   const nextYear = latestYear + 1
 
   return <main className="main" style={{maxWidth:850,margin:'0 auto'}}>
-    <div className="top"><div><div className="eyebrow">School setup</div><h1 className="title">School Profile</h1><p className="muted">These details are used on assessment reports.</p></div><Link className="btn secondary" href="/dashboard/reports/template">Report Template</Link></div>
+    <div className="top"><div><div className="eyebrow">School setup</div><h1 className="title">School Profile</h1><p className="muted">These details are used on assessment reports.</p></div></div>
     {params.error&&(() => { const i=params.error.indexOf('|'); return i>-1 ? <div className="notice error"><span className="font-semibold">{params.error.slice(0,i)}</span><span className="block text-xs opacity-80 mt-0.5">{params.error.slice(i+1)}</span></div> : <div className="notice error">{params.error}</div> })()}
     {params.saved&&<SuccessToast message="School profile saved" />}
     {params.year_created&&<div className="notice"><span className="font-semibold">Academic year {params.year_created} created.</span><span className="block text-xs opacity-80 mt-0.5">{params.promoted ?? 0} learners promoted automatically, {params.terminal ?? 0} Grade 9 learners retained in Grade 9, {params.skipped ?? 0} learners skipped because their current grade could not be resolved. {params.existing ?? 0} learners already had a placement for this year.</span></div>}

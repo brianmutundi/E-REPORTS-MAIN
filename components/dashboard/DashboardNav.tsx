@@ -39,8 +39,8 @@ const navGroups = [
     label: 'Assessment',
     items: [
       { name: 'Assessments', href: '/dashboard/examinations', icon: ClipboardList },
-      { name: 'Marks Entry', href: '/dashboard/marks', icon: ListChecks },
-      { name: 'Results', href: '/dashboard/results', icon: FileText },
+      { name: 'Assessment Scores', href: '/dashboard/marks', icon: ListChecks },
+      { name: 'Broadsheets', href: '/dashboard/broadsheets', icon: FileText },
       { name: 'Analysis', href: '/dashboard/analysis', icon: BarChart3 },
       { name: 'Assessment Reports', href: '/dashboard/reports', icon: Award },
       { name: 'Grading', href: '/dashboard/grading', icon: Settings2 },

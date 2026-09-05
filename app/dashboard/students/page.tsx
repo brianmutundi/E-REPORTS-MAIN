@@ -163,7 +163,7 @@ async function saveStudent(formData: FormData) {
 
   revalidatePath('/dashboard/students')
   revalidatePath('/dashboard/marks')
-  revalidatePath('/dashboard/results')
+  revalidatePath('/dashboard/broadsheets')
   redirect(`/dashboard/students?class_id=${encodeURIComponent(safeClassId)}&saved=1`)
 }
 
@@ -222,7 +222,7 @@ async function deleteStudent(formData: FormData) {
 
   revalidatePath('/dashboard/students')
   revalidatePath('/dashboard/marks')
-  revalidatePath('/dashboard/results')
+  revalidatePath('/dashboard/broadsheets')
 
   const classQuery = student.class_id ? `?class_id=${encodeURIComponent(student.class_id)}&` : '?'
   redirect(`/dashboard/students${classQuery}deleted=1`)

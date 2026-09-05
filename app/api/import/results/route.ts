@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
     })
 
     revalidatePath('/dashboard/marks')
-    revalidatePath('/dashboard/results')
+    revalidatePath('/dashboard/broadsheets')
     revalidatePath('/dashboard/reports')
     return NextResponse.json(result)
   }

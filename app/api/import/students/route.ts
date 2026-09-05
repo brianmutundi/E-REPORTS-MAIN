@@ -130,7 +130,7 @@ export async function POST(request: NextRequest) {
 
     revalidatePath('/dashboard/students')
     revalidatePath('/dashboard/marks')
-    revalidatePath('/dashboard/results')
+    revalidatePath('/dashboard/broadsheets')
 
     return NextResponse.json({
       ...result,

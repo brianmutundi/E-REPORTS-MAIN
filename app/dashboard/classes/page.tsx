@@ -32,7 +32,7 @@ async function saveClass(formData: FormData) {
   if (result.error) result = await attemptTeachers()
   if (result.error) result = await attemptBase()
   if (result.error) redirect('/dashboard/classes?error=' + encodeURIComponent(friendlyDbRedirect(result.error)))
-  revalidatePath('/dashboard/classes'); revalidatePath('/dashboard/marks'); revalidatePath('/dashboard/results'); redirect('/dashboard/classes?saved=1')
+  revalidatePath('/dashboard/classes'); revalidatePath('/dashboard/marks'); revalidatePath('/dashboard/broadsheets'); redirect('/dashboard/classes?saved=1')
 }
 async function deleteClass(formData: FormData) {
   'use server'

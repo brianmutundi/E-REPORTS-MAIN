@@ -159,7 +159,7 @@ export async function saveMarksGrid(
 function revalidatePaths() {
   revalidatePath('/dashboard/marks')
   revalidatePath('/dashboard/marks/import')
-  revalidatePath('/dashboard/results')
+  revalidatePath('/dashboard/broadsheets')
   revalidatePath('/dashboard/reports')
   revalidatePath('/dashboard/analysis')
 }
