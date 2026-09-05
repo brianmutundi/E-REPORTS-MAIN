@@ -11,9 +11,16 @@ const nextConfig: NextConfig = {
   // crashed with MODULE_NOT_FOUND. Keeping these modules external deploys their
   // full node_modules tree (fonts included) and the includes below force the
   // font directory into the traced function output as a belt-and-suspenders.
-  serverExternalPackages: ['@react-pdf/renderer', 'pdfkit'],
+  // handlebars + puppeteer back the selectable custom HTML report template
+  // (the CBC gemini-code template). Keeping them external deploys their full
+  // node_modules trees; the puppeteer browser cache lives inside the project
+  // (see .npmrc) so it is traced into the /api/reports/pdf function bundle.
+  serverExternalPackages: ['@react-pdf/renderer', 'pdfkit', 'handlebars', 'puppeteer', 'puppeteer-core'],
   outputFileTracingIncludes: {
-    '/api/reports/pdf': ['./node_modules/pdfkit/js/standard-fonts/**/*'],
+    '/api/reports/pdf': [
+      './node_modules/pdfkit/js/standard-fonts/**/*',
+      './node_modules/.cache/puppeteer/**/*',
+    ],
     '/api/results/export/pdf': ['./node_modules/pdfkit/js/standard-fonts/**/*'],
     '/api/analysis/export/pdf': ['./node_modules/pdfkit/js/standard-fonts/**/*'],
     '/api/students/export/pdf': ['./node_modules/pdfkit/js/standard-fonts/**/*'],
