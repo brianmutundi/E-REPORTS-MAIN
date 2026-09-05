@@ -11,7 +11,7 @@ import SuccessToast from '@/components/SuccessToast'
 import SubmitButton from '@/components/SubmitButton'
 import SmsSendQueue from '@/components/reports/SmsSendQueue'
 import { saveReportSettings } from './actions'
-import { parseTermReference, getTermRowDates } from '@/lib/terms'
+import { parseTermReference, getTermRowDates, getEffectiveTermDates, NEXT_TERM_OPENING_PLACEHOLDER } from '@/lib/terms'
 
 export default async function ReportsPage({ searchParams }: { searchParams: Promise<{ exam?: string; class?: string; student?: string; stream?: string; saved?: string; error?: string }> }) {
   const params = await searchParams
@@ -48,11 +48,14 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   // and the NEXT term's opening ("To be announced" when not yet configured).
   const termFallbackExam = hasSelection ? (exams?.find(e => e.id === params.exam) ?? null) ?? (exams?.at(-1) ?? null) : (exams?.at(-1) ?? null)
   const currentTermRef = parseTermReference({ term: termFallbackExam?.term ?? null, academicYear: termFallbackExam?.academic_year ?? null })
-  const [termRowDates] = await Promise.all([
+  const [termRowDates, effectiveDates] = await Promise.all([
     currentTermRef ? getTermRowDates(supabase, tenantId, currentTermRef) : Promise.resolve({ opening_date: null, closing_date: null }),
+    getEffectiveTermDates(supabase, tenantId, currentTermRef),
   ])
   const openingDate = termRowDates.opening_date
   const closingDate = termRowDates.closing_date
+  const currentClosingDate = effectiveDates.closingDate
+  const nextOpeningDate = effectiveDates.openingDate ?? NEXT_TERM_OPENING_PLACEHOLDER
   // Round 2 — the configured report detail and the heavy computed results
   // (needs template + class) are independent of each other.
   const [configured, remarkBanks] = hasSelection
