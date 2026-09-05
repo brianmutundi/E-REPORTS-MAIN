@@ -22,7 +22,7 @@ function buildParentMessage(item: SmsItem) {
   const isMidTerm = /mid[ -]?term/i.test(header)
   const periodLabel = isMidTerm ? 'mid-term' : 'assessment'
   const guidance = overall
-    ? 'Please encourage your child to maintain their strengths while continuing to work on areas that require improvement.'
+    ? 'Please encourage your child to build on their strengths while continuing to support areas that need more practice.'
     : 'Please continue supporting your child’s learning and progress.'
 
   return [
@@ -33,17 +33,17 @@ function buildParentMessage(item: SmsItem) {
     `Learner’s Name: ${item.fullName}`,
     `Admission No.: ${item.admissionNo}`,
     '',
-    `Your child’s ${periodLabel} assessment results are as follows:`,
+    `Here are your child’s ${periodLabel} assessment results:`,
     ...subjectLines,
     '',
     overall,
     '',
     guidance,
     '',
-    'Thank you for your continued support and partnership in your child’s learning.',
+    `Thank you for your continued partnership in ${item.fullName.split(' ')[0]}’s learning.`,
     '',
-    schoolName,
-    'Management',
+    'Warm regards,',
+    schoolName ? `${schoolName} Management` : 'Management',
   ].filter((line, index, all) => line !== '' || (index > 0 && index < all.length - 1)).join('\n')
 }
 
