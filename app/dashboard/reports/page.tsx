@@ -11,7 +11,7 @@ import SuccessToast from '@/components/SuccessToast'
 import SubmitButton from '@/components/SubmitButton'
 import SmsSendQueue from '@/components/reports/SmsSendQueue'
 import { saveReportSettings } from './actions'
-import { parseTermReference, getTermRowDates, getEffectiveTermDates, NEXT_TERM_OPENING_PLACEHOLDER } from '@/lib/terms'
+import { parseTermReference, getTermRowDates } from '@/lib/terms'
 
 export default async function ReportsPage({ searchParams }: { searchParams: Promise<{ exam?: string; class?: string; student?: string; stream?: string; saved?: string; error?: string }> }) {
   const params = await searchParams
@@ -22,7 +22,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   // of remote latency, so batching these avoids a serial waterfall that added up).
   const [classesRes, templateRes, gradingScale, streams, exams, tenant] = await Promise.all([
     supabase.from('classes').select('id,name,teacher_name,principal_name').eq('tenant_id', tenantId).order('name'),
-    supabase.from('report_templates').select('id,name,template_json,template_key,template_html').eq('tenant_id', tenantId).eq('is_default', true).maybeSingle(),
+    supabase.from('report_templates').select('id,name,template_json,template_key').eq('tenant_id', tenantId).eq('is_default', true).maybeSingle(),
     getTenantGradingScale(tenantId),
     params.class ? getScopeStreams(supabase, tenantId, params.class) : Promise.resolve([] as { id: string; name: string }[]),
     params.class ? getScopeExams(supabase, tenantId, params.class) : Promise.resolve([] as ScopeExam[]),
@@ -30,15 +30,14 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   ])
   let classes = classesRes.data
   if (classes === null) { const r = await supabase.from('classes').select('id,name').eq('tenant_id', tenantId).order('name'); classes = r.data as any }
-  let templateRow: { id: string | null; name: string | null; template_json: unknown; template_key?: string | null; template_html?: string | null } | null = templateRes.data
+  let templateRow: { id: string | null; name: string | null; template_json: unknown; template_key?: string | null } | null = templateRes.data
   if (!templateRow && templateRes.error) {
-    const retry = await supabase.from('report_templates').select('id,name,template_json,template_html').eq('tenant_id', tenantId).eq('is_default', true).maybeSingle()
-    if (!retry.error) templateRow = retry.data as { id: string | null; name: string | null; template_json: unknown; template_html?: string | null }
+    const retry = await supabase.from('report_templates').select('id,name,template_json').eq('tenant_id', tenantId).eq('is_default', true).maybeSingle()
+    if (!retry.error) templateRow = retry.data as { id: string | null; name: string | null; template_json: unknown }
   }
   const rowKey = templateRow?.template_key
   const templateKey = validTemplateKey(rowKey) ? rowKey : 'standard'
   const template = normalizeReportTemplate(templateRow?.template_json)
-  const htmlSource = templateRow?.template_html ?? ''
   const hasStreams = streams.length > 0
   const hasExams = exams.length > 0
   const gradeValid = Boolean(params.class && (classes ?? []).some(c => c.id === params.class))
@@ -49,14 +48,11 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   // and the NEXT term's opening ("To be announced" when not yet configured).
   const termFallbackExam = hasSelection ? (exams?.find(e => e.id === params.exam) ?? null) ?? (exams?.at(-1) ?? null) : (exams?.at(-1) ?? null)
   const currentTermRef = parseTermReference({ term: termFallbackExam?.term ?? null, academicYear: termFallbackExam?.academic_year ?? null })
-  const [termRowDates, effectiveDates] = await Promise.all([
+  const [termRowDates] = await Promise.all([
     currentTermRef ? getTermRowDates(supabase, tenantId, currentTermRef) : Promise.resolve({ opening_date: null, closing_date: null }),
-    getEffectiveTermDates(supabase, tenantId, currentTermRef),
   ])
   const openingDate = termRowDates.opening_date
   const closingDate = termRowDates.closing_date
-  const currentClosingDate = effectiveDates.closingDate
-  const nextOpeningDate = effectiveDates.openingDate ?? NEXT_TERM_OPENING_PLACEHOLDER
   // Round 2 — the configured report detail and the heavy computed results
   // (needs template + class) are independent of each other.
   const [configured, remarkBanks] = hasSelection
@@ -119,7 +115,6 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
       <div className="section-heading">
         <div>
           <h2 className="section-title">Report settings</h2>
-          <p className="muted">The selected form renders the PDF reports. Term dates are stored per {currentTermRef?.label ?? 'term'}{currentTermRef ? ` · ${currentTermRef.year}` : ''}; generated reports show this term&apos;s closing date and the next term&apos;s opening date (&ldquo;To be announced&rdquo; until the next term opening is set).</p>
         </div>
       </div>
       <form action={saveReportSettings}>
@@ -128,19 +123,10 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
         <input type="hidden" name="stream" value={params.stream ?? ''} />
         <div className="form-grid">
           <label className="field-label">Report template<select name="template_key" defaultValue={templateKey}>{REPORT_TEMPLATE_KEYS.map(key => <option key={key} value={key}>{REPORT_TEMPLATE_LABELS[key]}</option>)}</select></label>
-          <label className="field-label">Opening date <span className="opacity-60">({currentTermRef?.label ?? 'term'})</span><input type="date" name="opening_date" defaultValue={openingDate ?? ''} /></label>
-          <label className="field-label">Closing date <span className="opacity-60">({currentTermRef?.label ?? 'term'})</span><input type="date" name="closing_date" defaultValue={closingDate ?? ''} /></label>
+          <label className="field-label">Opening date<input type="date" name="opening_date" defaultValue={openingDate ?? ''} /></label>
+          <label className="field-label">Closing date<input type="date" name="closing_date" defaultValue={closingDate ?? ''} /></label>
         </div>
-        {templateKey === 'html_custom' && (
-          <div style={{ marginTop: 12 }}>
-            <label className="field-label">Custom HTML template — Handlebars placeholders
-              <textarea name="template_html" rows={14} style={{ width: '100%', fontFamily: 'monospace', fontSize: 12 }} defaultValue={htmlSource || ''} placeholder="Paste the raw HTML template here, or leave blank to use the built-in CBC gemini-code template." />
-            </label>
-            <p className="muted">Same placeholders as the CBC report (school, student, performance_levels, subjects, summary, term, financials, remarks). Rendered to PDF with the built-in engine.</p>
-          </div>
-        )}
         <div className="actions-inline" style={{ marginTop: 14 }}>
-          <p className="muted" style={{ margin: '0 12px 0 0' }}>Reports will show: closes <b>{currentClosingDate ?? '____________'}</b> &middot; next term opens <b>{nextOpeningDate}</b></p>
           <SubmitButton>Save report settings</SubmitButton>
         </div>
       </form>
