@@ -5,8 +5,7 @@ import { limitAuthenticatedRoute } from '@/lib/rate-limit'
 import { getConfiguredAssessmentResults, type AssessmentReportRow } from '@/lib/results'
 import { getReportTenant, normalizeReportTemplate, validTemplateKey, REPORT_TEMPLATE_KEYS, type ReportTemplateKey } from '@/lib/report-template'
 import { getTenantGradingScale } from '@/lib/grading'
-import { renderReport, buildCbcData, type ReportRenderProps } from '@/components/reports/templates'
-import { GEMINI_CBC_HTML_TEMPLATE, renderHtmlTemplateToPdf } from '@/lib/report-html'
+import { renderReport, type ReportRenderProps } from '@/components/reports/templates'
 import { getEffectiveTermDates, parseTermReference, NEXT_TERM_OPENING_PLACEHOLDER } from '@/lib/terms'
 
 export const runtime = 'nodejs'
@@ -32,11 +31,9 @@ export async function GET(request: NextRequest) {
     : clsRes.data as { id: string; name: string; teacher_name?: string | null; principal_name?: string | null } | null
   const [{ data: exam }, tplState] = await Promise.all([
     supabase.from('exams').select('id,name,term,academic_year').eq('id', examId).eq('tenant_id', profile.tenant_id).maybeSingle(),
-    supabase.from('report_templates').select('id,template_json,template_key,template_html').eq('tenant_id', profile.tenant_id).eq('is_default', true).maybeSingle(),
+    supabase.from('report_templates').select('id,template_json,template_key').eq('tenant_id', profile.tenant_id).eq('is_default', true).maybeSingle(),
   ])
-  // The template_key column is added by a later migration; the reports PDF must
-  // keep working for projects where it has not been applied yet.
-  let templateRow: { id: string; template_json: unknown; template_key?: string | null; template_html?: string | null } | null = tplState.data ?? null
+  let templateRow: { id: string; template_json: unknown; template_key?: string | null } | null = tplState.data ?? null
   if (!templateRow && tplState.error) {
     const fallbackRes = await supabase.from('report_templates').select('id,template_json').eq('tenant_id', profile.tenant_id).eq('is_default', true).maybeSingle()
     if (!fallbackRes.error) templateRow = fallbackRes.data
@@ -64,9 +61,6 @@ export async function GET(request: NextRequest) {
   ]) : [{ data: null }, { data: null }, { data: null }]
   const teacherRemarks = config?.teacher_remarks_enabled ? teacherRows?.map(r => r.remark) ?? [] : []
   const principalRemarks = config?.principal_remarks_enabled ? principalRows?.map(r => r.remark) ?? [] : []
-  // Term dates: the report shows the CURRENT term's closing date and the NEXT
-  // term's opening date (always after the closing date, "To be announced" when
-  // the next term has not published an opening yet).
   const effectiveDates = await getEffectiveTermDates(
     supabase,
     profile.tenant_id,
@@ -79,19 +73,7 @@ export async function GET(request: NextRequest) {
     tenant, examName: exam.name, term: exam.term, academicYear: exam.academic_year, className: scope.className, template, result, openingDate, closingDate, teacherRemarks, principalRemarks, gradingScale, teacherName: scope.teacherName, principalName: scope.principalName,
   })
 
-  let body: Uint8Array | Buffer
-  if (templateKey === 'html_custom') {
-    // Custom HTML (CBC gemini-code) template: compile the Handlebars source and
-    // rasterise it with the headless browser. The stored template_html is used
-    // when present; otherwise the built-in gemini-code CBC template.
-    const htmlTemplate = (templateRow?.template_html ?? '').trim() || GEMINI_CBC_HTML_TEMPLATE
-    body = await renderHtmlTemplateToPdf(
-      htmlTemplate,
-      selected.map(r => buildCbcData(makeProps(r)) as unknown as Record<string, unknown>),
-    )
-  } else {
-    body = (await renderToBuffer(<Document>{selected.map(r => renderReport(templateKey, makeProps(r)))}</Document>)) as unknown as Buffer
-  }
+  const body = (await renderToBuffer(<Document>{selected.map(r => renderReport(templateKey, makeProps(r)))}</Document>)) as unknown as Buffer
   const filename = studentId ? `report-${selected[0].admissionNo}.pdf` : `reports-${scope.className.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.pdf`
   return new Response(body as unknown as BodyInit, { headers: { 'Content-Type': 'application/pdf', 'Content-Disposition': `attachment; filename="${filename}"`, 'Cache-Control': 'no-store' } })
 }
